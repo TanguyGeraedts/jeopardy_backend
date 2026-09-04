@@ -1,0 +1,211 @@
+{
+  "id": "board-dummy-01",
+  "title": "Standard Jeopardy Board",
+  "categories": [
+    {
+      "id": "cat-1",
+      "name": "WORLD CAPITALS",
+      "clues": [
+        {
+          "id": "clue-101",
+          "value": 100,
+          "question": "This city is the capital of Japan.",
+          "answer": "Tokyo",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-102",
+          "value": 200,
+          "question": "This city on the Seine River is the capital of France.",
+          "answer": "Paris",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-103",
+          "value": 300,
+          "question": "This South American city sits high in the Andes and serves as Colombia's capital.",
+          "answer": "Bogotá",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-104",
+          "value": 400,
+          "question": "This city is the administrative capital of South Africa.",
+          "answer": "Pretoria",
+          "isDailyDouble": true
+        },
+        {
+          "id": "clue-105",
+          "value": 500,
+          "question": "This city is the capital of Australia.",
+          "answer": "Canberra",
+          "isDailyDouble": false
+        }
+      ]
+    },
+    {
+      "id": "cat-2",
+      "name": "PROGRAMMING LANGUAGES",
+      "clues": [
+        {
+          "id": "clue-201",
+          "value": 100,
+          "question": "This language uses .js extensions and powers interactive web pages.",
+          "answer": "JavaScript",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-202",
+          "value": 200,
+          "question": "Named after a British comedy troupe, this language emphasizes code readability with indentation.",
+          "answer": "Python",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-203",
+          "value": 300,
+          "question": "This strongly typed language runs on the JVM and was developed by Sun Microsystems.",
+          "answer": "Java",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-204",
+          "value": 400,
+          "question": "This Systems programming language developed at Mozilla emphasizes memory safety without garbage collection.",
+          "answer": "Rust",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-205",
+          "value": 500,
+          "question": "This statistical programming language's mascot is an artwork named 'R' from Bell Labs' lineage.",
+          "answer": "S / R",
+          "isDailyDouble": false
+        }
+      ]
+    },
+    {
+      "id": "cat-3",
+      "name": "VIDEO GAMES",
+      "clues": [
+        {
+          "id": "clue-301",
+          "value": 100,
+          "question": "This Italian plumber is Nintendo's mascot.",
+          "answer": "Mario",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-302",
+          "value": 200,
+          "question": "This block-building sandbox game is the best-selling video game of all time.",
+          "answer": "Minecraft",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-303",
+          "value": 300,
+          "question": "This protagonist wields the Master Sword in the Legend of Zelda series.",
+          "answer": "Link",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-304",
+          "value": 400,
+          "question": "This iconic orange-suited hero travels through City 17 in Half-Life 2.",
+          "answer": "Gordon Freeman",
+          "isDailyDouble": true
+        },
+        {
+          "id": "clue-305",
+          "value": 500,
+          "question": "This fictional city is the primary setting for the Bioshock series' underwater adventure.",
+          "answer": "Rapture",
+          "isDailyDouble": false
+        }
+      ]
+    },
+    {
+      "id": "cat-4",
+      "name": "SCIENCE & NATURE",
+      "clues": [
+        {
+          "id": "clue-401",
+          "value": 100,
+          "question": "This gas makes up roughly 78% of Earth's atmosphere.",
+          "answer": "Nitrogen",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-402",
+          "value": 200,
+          "question": "This is the hardest naturally occurring mineral on Earth.",
+          "answer": "Diamond",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-403",
+          "value": 300,
+          "question": "This power plant cell organelle is known as the powerhouse of the cell.",
+          "answer": "Mitochondria",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-404",
+          "value": 400,
+          "question": "This elementary particle carries an electric charge of -1 e.",
+          "answer": "Electron",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-405",
+          "value": 500,
+          "question": "This speed of light in a vacuum value is approximately this many kilometers per second.",
+          "answer": "300,000",
+          "isDailyDouble": false
+        }
+      ]
+    },
+    {
+      "id": "cat-5",
+      "name": "POP MUSIC",
+      "clues": [
+        {
+          "id": "clue-501",
+          "value": 100,
+          "question": "This 'King of Pop' released the hit album Thriller in 1982.",
+          "answer": "Michael Jackson",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-502",
+          "value": 200,
+          "question": "This artist released the album 21 featuring 'Rolling in the Deep'.",
+          "answer": "Adele",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-503",
+          "value": 300,
+          "question": "This Canadian artist sang 'Shape of You' and 'Thinking Out Loud'.",
+          "answer": "Ed Sheeran",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-504",
+          "value": 400,
+          "question": "This band was known as the 'Fab Four' from Liverpool.",
+          "answer": "The Beatles",
+          "isDailyDouble": false
+        },
+        {
+          "id": "clue-505",
+          "value": 500,
+          "question": "This pop icon made history with her Eras Tour beginning in 2023.",
+          "answer": "Taylor Swift",
+          "isDailyDouble": false
+        }
+      ]
+    }
+  ]
+}
