@@ -1,0 +1,19 @@
+### Variables
+@host = http://localhost:8080
+@contentType = application/json
+
+### 1. Create a new Game Session
+POST {{host}}/api/v1/game-sessions
+Content-Type: {{contentType}}
+
+{
+  "boardId": "board-standard-01"
+}
+
+### 2. Create Game Session Validation Error (Empty Board ID)
+POST {{host}}/api/v1/game-sessions
+Content-Type: {{contentType}}
+
+{
+  "boardId": ""
+}
