@@ -5,11 +5,19 @@ import dev.tanguy.game.jeopardy.common.domain.model.id.ClueId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.GameSessionId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.PlayerId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.TeamId;
+import dev.tanguy.game.jeopardy.common.events.DomainEvent;
+import dev.tanguy.game.jeopardy.gameplay.domain.event.ClueSelectedEvent;
+import dev.tanguy.game.jeopardy.gameplay.domain.event.GameSessionCreatedEvent;
+import dev.tanguy.game.jeopardy.gameplay.domain.event.GameStateChangedEvent;
+import dev.tanguy.game.jeopardy.gameplay.domain.event.AnswerEvaluatedEvent;
+import dev.tanguy.game.jeopardy.gameplay.domain.event.BuzzerPressedEvent;
+import dev.tanguy.game.jeopardy.gameplay.domain.event.PlayerJoinedEvent;
+import dev.tanguy.game.jeopardy.gameplay.domain.event.TeamCreatedEvent;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.clue.ClueAlreadyRevealedException;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.clue.ClueNotFoundException;
-import dev.tanguy.game.jeopardy.gameplay.domain.exception.session.IllegalGameStateTransitionException;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.player.InvalidTurnException;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.player.PlayerNotFoundException;
+import dev.tanguy.game.jeopardy.gameplay.domain.exception.session.IllegalGameStateTransitionException;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.team.TeamNotFoundException;
 import lombok.Getter;
 
@@ -22,6 +30,7 @@ public class GameSession {
     private final Map<PlayerId, Player> players = new HashMap<>();
     private final Map<TeamId, Team> teams = new HashMap<>();
     private final Map<ClueId, ClueState> clues = new HashMap<>();
+    private final List<DomainEvent> domainEvents = new ArrayList<>();
 
     private GameState state = GameState.LOBBY;
     private TeamId activeTeamId;
@@ -31,6 +40,7 @@ public class GameSession {
     public GameSession(GameSessionId id, List<ClueState> initialClues) {
         this.id = id;
         initialClues.forEach(clue -> this.clues.put(clue.getId(), clue));
+        this.domainEvents.add(new GameSessionCreatedEvent(this.id));
     }
 
     public void createTeam(TeamId teamId, String teamName) {
@@ -38,6 +48,7 @@ public class GameSession {
             throw new IllegalGameStateTransitionException(state, "createTeam");
         }
         teams.put(teamId, new Team(teamId, teamName));
+        this.domainEvents.add(new TeamCreatedEvent(this.id, teamId, teamName));
     }
 
     public void addPlayer(PlayerId playerId, String name, TeamId teamId) {
@@ -51,6 +62,7 @@ public class GameSession {
             assignedTeamId = TeamId.generate();
             Team soloTeam = new Team(assignedTeamId, name);
             teams.put(assignedTeamId, soloTeam);
+            this.domainEvents.add(new TeamCreatedEvent(this.id, assignedTeamId, name));
         }
 
         Team targetTeam = teams.get(assignedTeamId);
@@ -61,6 +73,8 @@ public class GameSession {
         Player player = new Player(playerId, name, assignedTeamId);
         players.put(playerId, player);
         targetTeam.addMember(playerId);
+
+        this.domainEvents.add(new PlayerJoinedEvent(this.id, playerId, assignedTeamId, name));
     }
 
     public void startGame() {
@@ -69,6 +83,8 @@ public class GameSession {
         }
         this.activeTeamId = teams.keySet().iterator().next();
         this.state = GameState.BOARD_SELECTION;
+
+        this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
     }
 
     public void selectClue(PlayerId selector, ClueId clueId) {
@@ -97,6 +113,9 @@ public class GameSession {
         clue.markAsRevealed();
         this.activeClueId = clueId;
         this.state = GameState.CLUE_READING;
+
+        this.domainEvents.add(new ClueSelectedEvent(this.id, selector, clueId));
+        this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
     }
 
     public void openBuzzers() {
@@ -104,6 +123,7 @@ public class GameSession {
             throw new IllegalGameStateTransitionException(state, "openBuzzers");
         }
         this.state = GameState.BUZZER_OPEN;
+        this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
     }
 
     public boolean registerBuzz(PlayerId playerId) {
@@ -117,6 +137,11 @@ public class GameSession {
 
         this.currentBuzzedPlayerId = playerId;
         this.state = GameState.ANSWER_EVALUATION;
+
+        // Record events internally
+        this.domainEvents.add(new BuzzerPressedEvent(this.id, playerId));
+        this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
+
         return true;
     }
 
@@ -150,6 +175,9 @@ public class GameSession {
             this.currentBuzzedPlayerId = null;
             this.state = GameState.BUZZER_OPEN;
         }
+
+        this.domainEvents.add(new AnswerEvaluatedEvent(this.id, currentBuzzedPlayerId, teamId, isCorrect, clue.getValue()));
+        this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
     }
 
     private void resetToBoardSelection() {
@@ -158,6 +186,12 @@ public class GameSession {
 
         boolean allRevealed = clues.values().stream().allMatch(ClueState::isRevealed);
         this.state = allRevealed ? GameState.GAME_OVER : GameState.BOARD_SELECTION;
+    }
+
+    public List<DomainEvent> pullDomainEvents() {
+        var copy = List.copyOf(domainEvents);
+        domainEvents.clear();
+        return copy;
     }
 
     public Collection<Player> getPlayers() { return Collections.unmodifiableCollection(players.values()); }
