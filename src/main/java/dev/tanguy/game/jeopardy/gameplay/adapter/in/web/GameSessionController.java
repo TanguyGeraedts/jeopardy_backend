@@ -2,6 +2,7 @@ package dev.tanguy.game.jeopardy.gameplay.adapter.in.web;
 
 import dev.tanguy.game.jeopardy.common.domain.model.id.ClueId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.GameSessionId;
+import dev.tanguy.game.jeopardy.common.domain.model.id.PlayerId;
 import dev.tanguy.game.jeopardy.common.web.ApiPaths;
 import dev.tanguy.game.jeopardy.common.web.ApiResponse;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.AnswerClueRequest;
@@ -9,8 +10,14 @@ import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.AnswerClueResponse;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.CreateGameSessionRequest;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.CreateGameSessionResponse;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.GameSessionResponse;
+import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.JoinGameSessionRequest;
+import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.JoinGameSessionResponse;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.mapper.GameSessionResponseMapper;
+import dev.tanguy.game.jeopardy.gameplay.domain.model.GameMode;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.GameSession;
+import dev.tanguy.game.jeopardy.gameplay.port.in.session.AddPlayerCommand;
+import dev.tanguy.game.jeopardy.gameplay.port.in.session.AddPlayerResult;
+import dev.tanguy.game.jeopardy.gameplay.port.in.session.AddPlayerUseCase;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.AnswerClueCommand;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.AnswerClueResult;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.AnswerClueUseCase;
@@ -39,12 +46,16 @@ public class GameSessionController {
     private final CreateGameSessionUseCase createGameSessionUseCase;
     private final GetGameSessionUseCase getGameSessionUseCase;
     private final AnswerClueUseCase answerClueUseCase;
+    private final AddPlayerUseCase addPlayerUseCase;
 
     @PostMapping
     public ResponseEntity<ApiResponse<CreateGameSessionResponse>> createGameSession(
             @Valid @RequestBody CreateGameSessionRequest request
     ) {
-        CreateGameSessionCommand command = new CreateGameSessionCommand(request.boardId());
+        CreateGameSessionCommand command = new CreateGameSessionCommand(
+                request.boardId(),
+                request.teamGame() ? GameMode.TEAM : GameMode.SOLO
+        );
         GameSessionId sessionId = createGameSessionUseCase.createGameSession(command);
 
         CreateGameSessionResponse responseData = new CreateGameSessionResponse(sessionId.value());
@@ -59,6 +70,32 @@ public class GameSessionController {
         GameSession session = getGameSessionUseCase.getGameSession(new GetGameSessionQuery(new GameSessionId(id)));
 
         return ResponseEntity.ok(ApiResponse.success(GameSessionResponseMapper.toResponse(session)));
+    }
+
+    @PostMapping(ApiPaths.Gameplay.JOIN)
+    public ResponseEntity<ApiResponse<JoinGameSessionResponse>> joinGameSession(
+            @PathVariable UUID id,
+            @Valid @RequestBody JoinGameSessionRequest request
+    ) {
+        AddPlayerCommand command = new AddPlayerCommand(
+                new GameSessionId(id),
+                new PlayerId(request.playerId()),
+                request.playerName(),
+                request.externalTeamId(),
+                request.teamName(),
+                request.teamColour()
+        );
+
+        AddPlayerResult result = addPlayerUseCase.addPlayer(command);
+
+        JoinGameSessionResponse responseData = new JoinGameSessionResponse(
+                result.playerId().value(), result.teamId().value(), result.alreadyJoined()
+        );
+
+        HttpStatus status = result.alreadyJoined() ? HttpStatus.OK : HttpStatus.CREATED;
+        String message = result.alreadyJoined() ? "Already joined" : "Joined game session successfully";
+
+        return ResponseEntity.status(status).body(ApiResponse.success(responseData, message));
     }
 
     @PostMapping(ApiPaths.Gameplay.ANSWER)

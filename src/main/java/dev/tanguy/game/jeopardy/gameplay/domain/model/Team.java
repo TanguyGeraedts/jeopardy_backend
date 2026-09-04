@@ -12,12 +12,20 @@ import java.util.Set;
 public class Team {
     private final TeamId id;
     private final String name;
+    private final String externalTeamId;
+    private final String colour;
     private final Set<PlayerId> memberIds = new HashSet<>();
     private int score;
 
     public Team(TeamId id, String name) {
+        this(id, name, null, null);
+    }
+
+    public Team(TeamId id, String name, String externalTeamId, String colour) {
         this.id = id;
         this.name = name;
+        this.externalTeamId = externalTeamId;
+        this.colour = colour;
         this.score = 0;
     }
 

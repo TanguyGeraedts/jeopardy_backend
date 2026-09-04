@@ -22,6 +22,8 @@ public final class GameSessionResponseMapper {
                 .map(t -> new TeamSummary(
                         t.getId().value().toString(),
                         t.getName(),
+                        t.getExternalTeamId(),
+                        t.getColour(),
                         t.getScore(),
                         t.getMemberIds().stream().map(id -> id.value().toString()).toList()))
                 .toList();
@@ -33,7 +35,8 @@ public final class GameSessionResponseMapper {
                         p.teamId() != null ? p.teamId().value().toString() : null))
                 .toList();
 
-        return new GameSessionResponse(session.getId().value(), session.getState().name(), clues, teams, players);
+        return new GameSessionResponse(
+                session.getId().value(), session.getState().name(), session.getMode().name(), clues, teams, players);
     }
 
     private static ClueSummary toClueSummary(ClueState clue) {

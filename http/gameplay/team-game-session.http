@@ -1,0 +1,109 @@
+@baseUrl = http://localhost:8080
+
+### Create a TEAM game session
+POST {{baseUrl}}/api/v1/game-sessions
+Content-Type: application/json
+
+{
+  "boardId": "board-dummy-01",
+  "teamGame": true
+}
+
+> {%
+    client.global.set("teamSessionId", response.body.data.gameSessionId);
+%}
+
+### Join host onto Team 1
+POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/join
+Content-Type: application/json
+
+{
+  "playerId": "c64bb9bf-1ccc-46cc-a82f-9643fee38013",
+  "playerName": "Tanguy",
+  "externalTeamId": "1",
+  "teamName": "Team 1",
+  "teamColour": "RED"
+}
+
+> {%
+    client.global.set("team1Id", response.body.data.teamId);
+    client.test("created onto Team 1", function() {
+        client.assert(response.status === 201);
+    });
+%}
+
+### Join player2 onto the same Team 1
+POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/join
+Content-Type: application/json
+
+{
+  "playerId": "188e376d-fb1a-428c-9739-8f5e24705424",
+  "playerName": "player2",
+  "externalTeamId": "1",
+  "teamName": "Team 1",
+  "teamColour": "RED"
+}
+
+> {%
+    client.test("correlates onto the same domain team", function() {
+        client.assert(response.body.data.teamId === client.global.get("team1Id"));
+    });
+%}
+
+### Re-join the host (page refresh) — idempotent, 200 not 201
+POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/join
+Content-Type: application/json
+
+{
+  "playerId": "c64bb9bf-1ccc-46cc-a82f-9643fee38013",
+  "playerName": "Tanguy",
+  "externalTeamId": "1",
+  "teamName": "Team 1",
+  "teamColour": "RED"
+}
+
+> {%
+    client.test("idempotent re-join", function() {
+        client.assert(response.status === 200);
+        client.assert(response.body.data.alreadyJoined === true);
+    });
+%}
+
+### Attempt a SOLO join into a TEAM game — should be rejected
+POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/join
+Content-Type: application/json
+
+{
+  "playerId": "f67ba636-ce42-40cc-9f86-3fc26781f811",
+  "playerName": "Player3",
+  "externalTeamId": null,
+  "teamName": null,
+  "teamColour": null
+}
+
+> {%
+    client.test("rejected with 409 — team required", function() {
+        client.assert(response.status === 409);
+        client.assert(response.body.detail.includes("team game"));
+    });
+%}
+
+### Get the team session
+GET {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}
+Accept: application/json
+
+> {%
+    client.global.set("clueId", response.body.data.clues[0].id);
+    client.test("mode is TEAM, 2 members on Team 1", function() {
+        client.assert(response.body.data.mode === "TEAM");
+    });
+%}
+
+### Answer a clue — still 409, session stuck in LOBBY (no startGame endpoint yet)
+POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/answer
+Content-Type: application/json
+
+{
+  "clueId": "{{clueId}}",
+  "answer": "A programming language"
+}

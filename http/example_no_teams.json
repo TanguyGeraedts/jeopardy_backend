@@ -1,0 +1,56 @@
+{
+  "id": "a2fce807-571c-4be6-aa43-be0981b6abe7",
+  "code": "AF15D1",
+  "status": "WAITING",
+  "hostPlayerId": "d62e271d-61e0-4d3a-9398-914538ba2de7",
+  "players": [
+    {
+      "playerId": "d62e271d-61e0-4d3a-9398-914538ba2de7",
+      "username": "Tanguy",
+      "role": "HOST",
+      "connected": true,
+      "host": true,
+      "joinedAt": "2026-09-04T08:59:40.802444Z",
+      "teamId": null
+    },
+    {
+      "playerId": "f67ba636-ce42-40cc-9f86-3fc26781f811",
+      "username": "Player2",
+      "role": "PLAYER",
+      "connected": true,
+      "host": false,
+      "joinedAt": "2026-09-04T08:59:40.802444Z",
+      "teamId": null
+    }
+  ],
+  "teams": [
+
+  ],
+  "config": {
+    "gameInfo": {
+      "gameName": "Jeopardy!",
+      "gameBanner": "https://example.com/jeopardy-banner.png",
+      "backgroundColor": "#060CE9",
+      "backgroundImage": "https://example.com/jeopardy-background.png",
+      "gameLaunchUrl": "https://play.mygame.com/jeopardy",
+      "handoffMethod": "REDIRECT",
+      "passLobbyData": true
+    },
+    "lobbyMode": "BANNER",
+    "characterConfig": null,
+    "maxPlayers": 3,
+    "minPlayers": 3,
+    "teamCount": null,
+    "balancedTeams": false,
+    "allowLateJoin": false,
+    "ttlSeconds": 3600,
+    "teamColours": [
+
+    ]
+  },
+  "createdAt": "2026-09-04T08:57:41.790256200Z",
+  "startedAt": null,
+  "full": false,
+  "playerCount": 2,
+  "waiting": true
+}

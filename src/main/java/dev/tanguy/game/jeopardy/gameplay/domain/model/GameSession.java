@@ -17,6 +17,8 @@ import dev.tanguy.game.jeopardy.gameplay.domain.exception.clue.ClueAlreadyReveal
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.clue.ClueNotFoundException;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.player.InvalidTurnException;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.player.PlayerNotFoundException;
+import dev.tanguy.game.jeopardy.gameplay.domain.exception.player.TeamAssignmentRequiredException;
+import dev.tanguy.game.jeopardy.gameplay.domain.exception.player.UnexpectedTeamAssignmentException;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.session.IllegalGameStateTransitionException;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.team.TeamNotFoundException;
 import lombok.Getter;
@@ -27,6 +29,7 @@ import java.util.*;
 public class GameSession {
 
     private final GameSessionId id;
+    private final GameMode mode;
     private final Map<PlayerId, Player> players = new HashMap<>();
     private final Map<TeamId, Team> teams = new HashMap<>();
     private final Map<ClueId, ClueState> clues = new HashMap<>();
@@ -37,23 +40,41 @@ public class GameSession {
     private PlayerId currentBuzzedPlayerId;
     private ClueId activeClueId;
 
-    public GameSession(GameSessionId id, List<ClueState> initialClues) {
+    public GameSession(GameSessionId id, List<ClueState> initialClues, GameMode mode) {
         this.id = id;
+        this.mode = mode;
         initialClues.forEach(clue -> this.clues.put(clue.getId(), clue));
         this.domainEvents.add(new GameSessionCreatedEvent(this.id));
     }
 
-    public void createTeam(TeamId teamId, String teamName) {
+    public Team createTeam(TeamId teamId, String teamName) {
+        return createTeam(teamId, teamName, null, null);
+    }
+
+    public Team createTeam(TeamId teamId, String teamName, String externalTeamId, String colour) {
         if (state != GameState.LOBBY) {
             throw new IllegalGameStateTransitionException(state, "createTeam");
         }
-        teams.put(teamId, new Team(teamId, teamName));
+        Team team = new Team(teamId, teamName, externalTeamId, colour);
+        teams.put(teamId, team);
         this.domainEvents.add(new TeamCreatedEvent(this.id, teamId, teamName));
+        return team;
     }
 
     public void addPlayer(PlayerId playerId, String name, TeamId teamId) {
+        if (players.containsKey(playerId)) {
+            return;
+        }
+
         if (state != GameState.LOBBY) {
             throw new IllegalGameStateTransitionException(state, "addPlayer");
+        }
+
+        if (mode == GameMode.TEAM && teamId == null) {
+            throw new TeamAssignmentRequiredException();
+        }
+        if (mode == GameMode.SOLO && teamId != null) {
+            throw new UnexpectedTeamAssignmentException(teamId);
         }
 
         // Solo Mode auto-creation of a Team if no teamId provided
@@ -75,6 +96,15 @@ public class GameSession {
         targetTeam.addMember(playerId);
 
         this.domainEvents.add(new PlayerJoinedEvent(this.id, playerId, assignedTeamId, name));
+    }
+
+    public Optional<Team> findTeamByExternalId(String externalTeamId) {
+        if (externalTeamId == null) {
+            return Optional.empty();
+        }
+        return teams.values().stream()
+                .filter(team -> externalTeamId.equals(team.getExternalTeamId()))
+                .findFirst();
     }
 
     public void startGame() {
@@ -138,7 +168,6 @@ public class GameSession {
         this.currentBuzzedPlayerId = playerId;
         this.state = GameState.ANSWER_EVALUATION;
 
-        // Record events internally
         this.domainEvents.add(new BuzzerPressedEvent(this.id, playerId));
         this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
 

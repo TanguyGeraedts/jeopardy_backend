@@ -26,7 +26,7 @@ public class CreateGameSessionUseCaseImpl implements CreateGameSessionUseCase {
         List<ClueState> initialClues = loadBoardTemplatePort.loadCluesForBoard(command.boardId());
 
         GameSessionId newSessionId = GameSessionId.generate();
-        GameSession session = new GameSession(newSessionId, initialClues);
+        GameSession session = new GameSession(newSessionId, initialClues, command.mode());
 
         saveGameSessionPort.saveGameSession(session);
         domainEventPublisher.publishAll(session.pullDomainEvents());

@@ -1,0 +1,78 @@
+{
+  "id": "2399c820-748a-47bf-a0f3-2f0be99acd5d",
+  "code": "20A2BA",
+  "status": "WAITING",
+  "hostPlayerId": "c64bb9bf-1ccc-46cc-a82f-9643fee38013",
+  "players": [
+    {
+      "playerId": "c64bb9bf-1ccc-46cc-a82f-9643fee38013",
+      "username": "Tanguy",
+      "role": "HOST",
+      "connected": false,
+      "host": true,
+      "joinedAt": "2026-09-04T09:03:04.714819400Z",
+      "teamId": 1
+    },
+    {
+      "playerId": "188e376d-fb1a-428c-9739-8f5e24705424",
+      "username": "player2",
+      "role": "PLAYER",
+      "connected": true,
+      "host": false,
+      "joinedAt": "2026-09-04T09:03:04.714819400Z",
+      "teamId": 2
+    }
+  ],
+  "teams": [
+    {
+      "teamId": 1,
+      "name": "Team 1",
+      "colour": "RED",
+      "playerIds": [
+        "c64bb9bf-1ccc-46cc-a82f-9643fee38013"
+      ],
+      "maxSize": 4,
+      "full": false,
+      "size": 1
+    },
+    {
+      "teamId": 2,
+      "name": "Team 2",
+      "colour": "BLUE",
+      "playerIds": [
+        "188e376d-fb1a-428c-9739-8f5e24705424"
+      ],
+      "maxSize": 4,
+      "full": false,
+      "size": 1
+    }
+  ],
+  "config": {
+    "gameInfo": {
+      "gameName": "Capture the Flag",
+      "gameBanner": "https://images.ctfassets.net/aoyx73g9h2pg/3H8sLBKCH7xIph1YZmjFvd/8292d73649a27a4eb65724fa1df629f7/10684-1024x575.jpg?w=3840&q=100",
+      "backgroundColor": "#049bdb",
+      "backgroundImage": null,
+      "gameLaunchUrl": "https://play.ctfgame.com",
+      "handoffMethod": "IFRAME",
+      "passLobbyData": true
+    },
+    "lobbyMode": "BANNER",
+    "characterConfig": null,
+    "maxPlayers": 8,
+    "minPlayers": 2,
+    "teamCount": 2,
+    "balancedTeams": true,
+    "allowLateJoin": false,
+    "ttlSeconds": 3600,
+    "teamColours": [
+      "RED",
+      "BLUE"
+    ]
+  },
+  "createdAt": "2026-09-04T09:01:32.998769700Z",
+  "startedAt": null,
+  "full": false,
+  "playerCount": 2,
+  "waiting": true
+}

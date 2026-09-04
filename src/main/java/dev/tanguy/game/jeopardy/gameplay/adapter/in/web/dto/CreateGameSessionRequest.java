@@ -4,5 +4,6 @@ import jakarta.validation.constraints.NotBlank;
 
 public record CreateGameSessionRequest(
         @NotBlank(message = "Board ID is required")
-        String boardId
+        String boardId,
+        boolean teamGame
 ) {}
