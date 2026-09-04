@@ -9,5 +9,6 @@ public final class ApiPaths {
     public static final class Gameplay {
         public static final String BASE = V1_BASE + "/game-sessions";
         public static final String BY_ID = "/{id}";
+        public static final String ANSWER = BY_ID + "/answer";
     }
 }
