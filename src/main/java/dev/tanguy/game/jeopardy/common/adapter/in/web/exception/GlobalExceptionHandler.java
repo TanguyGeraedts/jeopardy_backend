@@ -3,6 +3,8 @@ package dev.tanguy.game.jeopardy.common.adapter.in.web.exception;
 import dev.tanguy.game.jeopardy.common.domain.exception.DomainConflictException;
 import dev.tanguy.game.jeopardy.common.domain.exception.InvalidValueException;
 import dev.tanguy.game.jeopardy.common.domain.exception.NotFoundException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -31,6 +33,28 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleDomainConflict(DomainConflictException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         problem.setTitle("Domain Invariant Conflict");
+        problem.setType(BLANK_TYPE);
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    // --- 403 FORBIDDEN (e.g. @PreAuthorize denied) ---
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail handleAccessDenied(AccessDeniedException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, "You do not have permission to perform this action.");
+        problem.setTitle("Forbidden");
+        problem.setType(BLANK_TYPE);
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    // --- 401 UNAUTHORIZED (authentication missing inside a controller call) ---
+    @ExceptionHandler(AuthenticationException.class)
+    public ProblemDetail handleAuthentication(AuthenticationException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.UNAUTHORIZED, "Authentication is required to access this resource.");
+        problem.setTitle("Unauthorized");
         problem.setType(BLANK_TYPE);
         problem.setProperty("timestamp", Instant.now());
         return problem;

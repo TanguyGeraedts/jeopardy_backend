@@ -1,0 +1,9 @@
+app:
+  security:
+    demo-endpoints: true
+    mock:
+      issuer: http://localhost:8080/mock-issuer
+      secret: ${MOCK_JWT_SECRET:dev-only-secret-change-me-at-least-32-bytes!!}
+      ttl: 1h
+    jwt:
+      roles-claim-paths: [roles]

@@ -1,0 +1,16 @@
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${OIDC_ISSUER_URI}      # discovery + signature + issuer validation
+          # jwk-set-uri: ${OIDC_JWKS_URI}     # only if the provider has no discovery document
+          # audiences: ${OIDC_AUDIENCE}       # strongly recommended: reject tokens meant for other apps
+
+app:
+  security:
+    demo-endpoints: false
+    jwt:
+      roles-claim-paths: [roles, realm_access.roles]
+      authority-prefix: ROLE_
+      uppercase: true
