@@ -12,4 +12,8 @@ public final class ApiPaths {
         public static final String ANSWER = BY_ID + "/answer";
         public static final String JOIN = BY_ID + "/join";
     }
+
+    public static final class Creator {
+        public static final String BASE = V1_BASE + "/quizzes";
+    }
 }
