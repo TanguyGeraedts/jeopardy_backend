@@ -1,5 +1,9 @@
 package dev.tanguy.game.jeopardy.creator.adapter.in.web;
 
+import com.jayway.jsonpath.JsonPath;
+import dev.tanguy.game.jeopardy.common.domain.model.id.CategoryId;
+import dev.tanguy.game.jeopardy.common.domain.model.id.OwnerId;
+import dev.tanguy.game.jeopardy.common.domain.model.id.QuestionId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.QuizId;
 import dev.tanguy.game.jeopardy.common.infrastructure.security.CurrentUser;
 import dev.tanguy.game.jeopardy.common.infrastructure.security.SecurityConfig;
@@ -7,10 +11,15 @@ import dev.tanguy.game.jeopardy.common.infrastructure.security.mock.MockAuthCont
 import dev.tanguy.game.jeopardy.common.infrastructure.security.mock.MockJwtConfig;
 import dev.tanguy.game.jeopardy.common.infrastructure.security.mock.MockTokenService;
 import dev.tanguy.game.jeopardy.common.web.ApiPaths;
+import dev.tanguy.game.jeopardy.creator.domain.event.quiz.QuizNotFoundException;
+import dev.tanguy.game.jeopardy.creator.domain.model.AnswerType;
+import dev.tanguy.game.jeopardy.creator.domain.model.Category;
+import dev.tanguy.game.jeopardy.creator.domain.model.Question;
 import dev.tanguy.game.jeopardy.creator.domain.model.Quiz;
 import dev.tanguy.game.jeopardy.creator.port.in.quiz.CreateQuizCommand;
 import dev.tanguy.game.jeopardy.creator.port.in.quiz.CreateQuizUseCase;
-import com.jayway.jsonpath.JsonPath;
+import dev.tanguy.game.jeopardy.creator.port.in.quiz.GetQuizQuery;
+import dev.tanguy.game.jeopardy.creator.port.in.quiz.GetQuizUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -29,6 +38,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -47,13 +57,18 @@ class QuizControllerTest {
     @MockitoBean
     CreateQuizUseCase createQuizUseCase;
 
+    @MockitoBean
+    GetQuizUseCase getQuizUseCase;
+
     @BeforeEach
-    void stubUseCase() {
+    void stubCreate() {
         given(createQuizUseCase.createQuiz(any())).willAnswer(invocation -> {
             CreateQuizCommand command = invocation.getArgument(0);
             return new Quiz(QuizId.generate(), command.ownerId(), command.name());
         });
     }
+
+    // ---------- create ----------
 
     @Test
     void createQuiz_withoutToken_isUnauthorized() throws Exception {
@@ -73,7 +88,8 @@ class QuizControllerTest {
                         .content("{\"name\":\"  General Knowledge  \",\"ownerId\":\"99999999-9999-9999-9999-999999999999\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.name").value("General Knowledge"))
-                .andExpect(jsonPath("$.data.id").exists());
+                .andExpect(jsonPath("$.data.id").exists())
+                .andExpect(jsonPath("$.data.categories").isEmpty());
 
         ArgumentCaptor<CreateQuizCommand> captor = ArgumentCaptor.forClass(CreateQuizCommand.class);
         verify(createQuizUseCase).createQuiz(captor.capture());
@@ -114,6 +130,72 @@ class QuizControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(createQuizUseCase);
+    }
+
+    // ---------- get ----------
+
+    @Test
+    void getQuiz_withoutToken_isUnauthorized() throws Exception {
+        mockMvc.perform(get(QUIZZES + "/" + UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(getQuizUseCase);
+    }
+
+    @Test
+    void getQuiz_returnsFullQuiz_andAsksOnBehalfOfTheCaller() throws Exception {
+        Quiz quiz = sampleQuiz();
+        given(getQuizUseCase.getQuiz(any())).willReturn(quiz);
+
+        mockMvc.perform(get(QUIZZES + "/" + quiz.getId().value())
+                        .header("Authorization", "Bearer " + tokenFor(ALICE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(quiz.getId().value()))
+                .andExpect(jsonPath("$.data.name").value("Trivia"))
+                .andExpect(jsonPath("$.data.categories[0].name").value("Science"))
+                .andExpect(jsonPath("$.data.categories[0].questions[0].points").value(100))
+                .andExpect(jsonPath("$.data.categories[0].questions[0].questionText").value("What is H2O?"))
+                .andExpect(jsonPath("$.data.categories[0].questions[0].answerText").value("Water"))
+                .andExpect(jsonPath("$.data.categories[0].questions[0].answerType").value("TEXT"))
+                .andExpect(jsonPath("$.data.categories[0].questions[0].dailyDouble").value(false));
+
+        ArgumentCaptor<GetQuizQuery> captor = ArgumentCaptor.forClass(GetQuizQuery.class);
+        verify(getQuizUseCase).getQuiz(captor.capture());
+        assertThat(captor.getValue().quizId()).isEqualTo(quiz.getId());
+        assertThat(captor.getValue().requesterId().value()).isEqualTo(UUID.fromString(ALICE));
+    }
+
+    @Test
+    void getQuiz_whenUseCaseSaysNotFound_isNotFound() throws Exception {
+        given(getQuizUseCase.getQuiz(any())).willThrow(new QuizNotFoundException(QuizId.generate()));
+
+        mockMvc.perform(get(QUIZZES + "/" + UUID.randomUUID())
+                        .header("Authorization", "Bearer " + tokenFor(ALICE)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Resource Not Found"));
+    }
+
+    @Test
+    void getQuiz_withNonUuidId_isBadRequest() throws Exception {
+        mockMvc.perform(get(QUIZZES + "/not-a-uuid")
+                        .header("Authorization", "Bearer " + tokenFor(ALICE)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(getQuizUseCase);
+    }
+
+    // ---------- helpers ----------
+
+    private static Quiz sampleQuiz() {
+        QuizId quizId = QuizId.generate();
+        Quiz quiz = new Quiz(quizId, OwnerId.of(ALICE), "Trivia");
+
+        CategoryId categoryId = CategoryId.generate();
+        Category category = new Category(categoryId, quizId, "Science");
+        category.addQuestion(new Question(
+                QuestionId.generate(), categoryId, 100, "What is H2O?", "Water", AnswerType.TEXT, null));
+        quiz.addCategory(category);
+        return quiz;
     }
 
     private String tokenFor(String subject) throws Exception {

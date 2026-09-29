@@ -11,6 +11,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.net.URI;
 import java.time.Instant;
@@ -42,6 +43,17 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleUnreadableBody(HttpMessageNotReadableException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "Request body is missing or malformed.");
+        problem.setTitle("Invalid Request Parameters");
+        problem.setType(BLANK_TYPE);
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    // --- 400 BAD REQUEST: path/query parameter of the wrong type (e.g. a non-UUID id) ---
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, "Invalid value for parameter '" + ex.getName() + "'.");
         problem.setTitle("Invalid Request Parameters");
         problem.setType(BLANK_TYPE);
         problem.setProperty("timestamp", Instant.now());
