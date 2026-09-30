@@ -11,6 +11,7 @@ import dev.tanguy.game.jeopardy.creator.domain.model.Question;
 import dev.tanguy.game.jeopardy.creator.domain.model.Quiz;
 import dev.tanguy.game.jeopardy.creator.port.in.quiz.CreateQuizCommand;
 import dev.tanguy.game.jeopardy.creator.port.in.quiz.GetQuizQuery;
+import dev.tanguy.game.jeopardy.creator.port.in.quiz.GetQuizzesByOwnerQuery;
 
 import java.util.UUID;
 
@@ -24,6 +25,10 @@ public final class QuizWebMapper {
 
     public static GetQuizQuery toQuery(UUID quizId, OwnerId requesterId) {
         return new GetQuizQuery(QuizId.of(quizId.toString()), requesterId);
+    }
+
+    public static GetQuizzesByOwnerQuery toQuery(OwnerId ownerId) {
+        return new GetQuizzesByOwnerQuery(ownerId);
     }
 
     public static QuizResponse toResponse(Quiz quiz) {

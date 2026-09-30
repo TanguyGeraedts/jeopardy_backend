@@ -20,6 +20,8 @@ import dev.tanguy.game.jeopardy.creator.port.in.quiz.CreateQuizCommand;
 import dev.tanguy.game.jeopardy.creator.port.in.quiz.CreateQuizUseCase;
 import dev.tanguy.game.jeopardy.creator.port.in.quiz.GetQuizQuery;
 import dev.tanguy.game.jeopardy.creator.port.in.quiz.GetQuizUseCase;
+import dev.tanguy.game.jeopardy.creator.port.in.quiz.GetQuizzesByOwnerQuery;
+import dev.tanguy.game.jeopardy.creator.port.in.quiz.GetQuizzesByOwnerUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -31,6 +33,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,6 +62,9 @@ class QuizControllerTest {
 
     @MockitoBean
     GetQuizUseCase getQuizUseCase;
+
+    @MockitoBean
+    GetQuizzesByOwnerUseCase getQuizzesByOwnerUseCase;
 
     @BeforeEach
     void stubCreate() {
@@ -182,6 +188,48 @@ class QuizControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(getQuizUseCase);
+    }
+
+    // ---------- get my quizzes ----------
+
+    @Test
+    void getAllMyQuizzes_withoutToken_isUnauthorized() throws Exception {
+        mockMvc.perform(get(QUIZZES + ApiPaths.Creator.ME))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(getQuizzesByOwnerUseCase);
+    }
+
+    @Test
+    void getAllMyQuizzes_returnsQuizzesForAuthenticatedUser() throws Exception {
+        Quiz quiz1 = sampleQuiz();
+        Quiz quiz2 = new Quiz(QuizId.generate(), OwnerId.of(ALICE), "Pop Culture");
+        given(getQuizzesByOwnerUseCase.getMyQuizzes(any())).willReturn(List.of(quiz1, quiz2));
+
+        mockMvc.perform(get(QUIZZES + ApiPaths.Creator.ME)
+                        .header("Authorization", "Bearer " + tokenFor(ALICE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].id").value(quiz1.getId().value()))
+                .andExpect(jsonPath("$.data[0].name").value("Trivia"))
+                .andExpect(jsonPath("$.data[1].id").value(quiz2.getId().value()))
+                .andExpect(jsonPath("$.data[1].name").value("Pop Culture"));
+
+        ArgumentCaptor<GetQuizzesByOwnerQuery> captor = ArgumentCaptor.forClass(GetQuizzesByOwnerQuery.class);
+        verify(getQuizzesByOwnerUseCase).getMyQuizzes(captor.capture());
+        assertThat(captor.getValue().ownerId().value()).isEqualTo(UUID.fromString(ALICE));
+    }
+
+    @Test
+    void getAllMyQuizzes_whenUserHasNoQuizzes_returnsEmptyList() throws Exception {
+        given(getQuizzesByOwnerUseCase.getMyQuizzes(any())).willReturn(List.of());
+
+        mockMvc.perform(get(QUIZZES + ApiPaths.Creator.ME)
+                        .header("Authorization", "Bearer " + tokenFor(ALICE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isEmpty());
+
+        verify(getQuizzesByOwnerUseCase).getMyQuizzes(any());
     }
 
     // ---------- helpers ----------
