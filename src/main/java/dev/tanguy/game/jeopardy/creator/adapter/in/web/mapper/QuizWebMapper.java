@@ -50,7 +50,7 @@ public final class QuizWebMapper {
         );
     }
 
-    private static CategoryResponse toCategoryResponse(Category category) {
+    public static CategoryResponse toCategoryResponse(Category category) {
         return new CategoryResponse(
                 UUID.fromString(category.getId().value()),
                 category.getName(),
@@ -58,7 +58,7 @@ public final class QuizWebMapper {
         );
     }
 
-    private static QuestionResponse toQuestionResponse(Question question) {
+    public static QuestionResponse toQuestionResponse(Question question) {
         return new QuestionResponse(
                 UUID.fromString(question.getId().value()),
                 question.getPoints(),

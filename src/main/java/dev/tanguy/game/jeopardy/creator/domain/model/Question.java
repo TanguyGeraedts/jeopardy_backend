@@ -7,6 +7,7 @@ import dev.tanguy.game.jeopardy.creator.domain.event.question.InvalidPointsExcep
 import dev.tanguy.game.jeopardy.creator.domain.event.question.InvalidQuestionTextException;
 import dev.tanguy.game.jeopardy.creator.domain.event.question.MissingMediaUrlException;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.util.Objects;
 
@@ -20,6 +21,7 @@ public class Question {
     private String answerText;
     private AnswerType answerType;
     private String mediaUrl;
+    @Setter
     private boolean isDailyDouble;
 
     public Question(
@@ -85,7 +87,7 @@ public class Question {
             throw new MissingMediaUrlException(this.id, resolvedType);
         }
         this.answerType = resolvedType;
-        this.mediaUrl = mediaUrl;
+        this.mediaUrl = resolvedType == AnswerType.TEXT ? null : mediaUrl;
     }
 
     public void toggleDailyDouble() {

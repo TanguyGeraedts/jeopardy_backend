@@ -4,6 +4,7 @@ import dev.tanguy.game.jeopardy.common.domain.model.id.CategoryId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.OwnerId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.QuizId;
 import dev.tanguy.game.jeopardy.creator.domain.event.quiz.CategoryNotFoundException;
+import dev.tanguy.game.jeopardy.creator.domain.event.quiz.DuplicateCategoryNameException;
 import dev.tanguy.game.jeopardy.creator.domain.event.quiz.InvalidQuizNameException;
 import lombok.Getter;
 
@@ -45,7 +46,25 @@ public class Quiz {
 
     public void addCategory(Category category) {
         Objects.requireNonNull(category, "Category cannot be null");
+        validateUniqueCategoryName(category.getName(), null);
         this.categories.add(category);
+    }
+
+    public Category getCategory(CategoryId categoryId) {
+        Objects.requireNonNull(categoryId, "CategoryId cannot be null");
+        return this.categories.stream()
+                .filter(c -> c.getId().equals(categoryId))
+                .findFirst()
+                .orElseThrow(() -> new CategoryNotFoundException(this.id, categoryId));
+    }
+
+    public Category renameCategory(CategoryId categoryId, String newName) {
+        Category category = getCategory(categoryId);
+        if (newName != null) {
+            validateUniqueCategoryName(newName.strip(), categoryId);
+        }
+        category.setName(newName == null ? null : newName.strip());
+        return category;
     }
 
     public void removeCategory(CategoryId categoryId) {
@@ -58,5 +77,14 @@ public class Quiz {
 
     public List<Category> getCategories() {
         return Collections.unmodifiableList(categories);
+    }
+
+    private void validateUniqueCategoryName(String name, CategoryId ignoreCategoryId) {
+        boolean exists = this.categories.stream()
+                .filter(c -> !c.getId().equals(ignoreCategoryId))
+                .anyMatch(c -> c.getName().equalsIgnoreCase(name));
+        if (exists) {
+            throw new DuplicateCategoryNameException(this.id, name);
+        }
     }
 }

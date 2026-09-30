@@ -16,5 +16,10 @@ public final class ApiPaths {
     public static final class Creator {
         public static final String BASE = V1_BASE + "/quizzes";
         public static final String BY_ID = "/{id}";
+
+        public static final String CATEGORIES = BY_ID + "/categories";
+        public static final String CATEGORY_BY_ID = CATEGORIES + "/{categoryId}";
+        public static final String QUESTIONS = CATEGORY_BY_ID + "/questions";
+        public static final String QUESTION_BY_ID = QUESTIONS + "/{questionId}";
     }
 }

@@ -60,6 +60,34 @@ public class Category {
         }
     }
 
+    public Question getQuestion(QuestionId questionId) {
+        Objects.requireNonNull(questionId, "QuestionId cannot be null");
+        return this.questions.stream()
+                .filter(q -> q.getId().equals(questionId))
+                .findFirst()
+                .orElseThrow(() -> new QuestionNotFoundException(this.id, questionId));
+    }
+
+
+    public Question updateQuestion(
+            QuestionId questionId,
+            int points,
+            String questionText,
+            String answerText,
+            AnswerType answerType,
+            String mediaUrl,
+            boolean dailyDouble
+    ) {
+        Question question = getQuestion(questionId);
+        validateNoDuplicatePoints(points, questionId);
+
+        question.setPoints(points);
+        question.setQuestionText(questionText);
+        question.setAnswer(answerText, answerType, mediaUrl);
+        question.setDailyDouble(dailyDouble);
+        return question;
+    }
+
     public List<Question> getQuestions() {
         return Collections.unmodifiableList(questions);
     }
