@@ -28,7 +28,7 @@ public class Quiz {
         this.id = Objects.requireNonNull(id, "QuizId cannot be null");
         this.ownerId = Objects.requireNonNull(ownerId, "OwnerId cannot be null");
 
-        setName(name);
+        rename(name);
 
         this.categories = new ArrayList<>();
         if (categories != null) {
@@ -36,7 +36,7 @@ public class Quiz {
         }
     }
 
-    public void setName(String name) {
+    public void rename(String name) {
         if (name == null || name.isBlank()) {
             throw new InvalidQuizNameException(this.id);
         }

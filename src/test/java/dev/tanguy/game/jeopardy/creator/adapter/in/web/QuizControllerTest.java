@@ -18,10 +18,14 @@ import dev.tanguy.game.jeopardy.creator.domain.model.Question;
 import dev.tanguy.game.jeopardy.creator.domain.model.Quiz;
 import dev.tanguy.game.jeopardy.creator.port.in.quiz.CreateQuizCommand;
 import dev.tanguy.game.jeopardy.creator.port.in.quiz.CreateQuizUseCase;
+import dev.tanguy.game.jeopardy.creator.port.in.quiz.DeleteQuizCommand;
+import dev.tanguy.game.jeopardy.creator.port.in.quiz.DeleteQuizUseCase;
 import dev.tanguy.game.jeopardy.creator.port.in.quiz.GetQuizQuery;
 import dev.tanguy.game.jeopardy.creator.port.in.quiz.GetQuizUseCase;
 import dev.tanguy.game.jeopardy.creator.port.in.quiz.GetQuizzesByOwnerQuery;
 import dev.tanguy.game.jeopardy.creator.port.in.quiz.GetQuizzesByOwnerUseCase;
+import dev.tanguy.game.jeopardy.creator.port.in.quiz.UpdateQuizCommand;
+import dev.tanguy.game.jeopardy.creator.port.in.quiz.UpdateQuizUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -39,10 +43,14 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -66,11 +74,22 @@ class QuizControllerTest {
     @MockitoBean
     GetQuizzesByOwnerUseCase getQuizzesByOwnerUseCase;
 
+    @MockitoBean
+    UpdateQuizUseCase updateQuizUseCase;
+
+    @MockitoBean
+    DeleteQuizUseCase deleteQuizUseCase;
+
     @BeforeEach
-    void stubCreate() {
+    void stubUseCases() {
         given(createQuizUseCase.createQuiz(any())).willAnswer(invocation -> {
             CreateQuizCommand command = invocation.getArgument(0);
             return new Quiz(QuizId.generate(), command.ownerId(), command.name());
+        });
+
+        given(updateQuizUseCase.updateQuiz(any())).willAnswer(invocation -> {
+            UpdateQuizCommand command = invocation.getArgument(0);
+            return new Quiz(command.quizId(), command.requesterId(), command.name());
         });
     }
 
@@ -190,23 +209,23 @@ class QuizControllerTest {
         verifyNoInteractions(getQuizUseCase);
     }
 
-    // ---------- get my quizzes ----------
+    // ---------- get my quizzes (GET /quizzes) ----------
 
     @Test
-    void getAllMyQuizzes_withoutToken_isUnauthorized() throws Exception {
-        mockMvc.perform(get(QUIZZES + ApiPaths.Creator.ME))
+    void getMyQuizzes_withoutToken_isUnauthorized() throws Exception {
+        mockMvc.perform(get(QUIZZES))
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(getQuizzesByOwnerUseCase);
     }
 
     @Test
-    void getAllMyQuizzes_returnsQuizzesForAuthenticatedUser() throws Exception {
+    void getMyQuizzes_returnsQuizzesForAuthenticatedUser() throws Exception {
         Quiz quiz1 = sampleQuiz();
         Quiz quiz2 = new Quiz(QuizId.generate(), OwnerId.of(ALICE), "Pop Culture");
         given(getQuizzesByOwnerUseCase.getMyQuizzes(any())).willReturn(List.of(quiz1, quiz2));
 
-        mockMvc.perform(get(QUIZZES + ApiPaths.Creator.ME)
+        mockMvc.perform(get(QUIZZES)
                         .header("Authorization", "Bearer " + tokenFor(ALICE)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
@@ -221,15 +240,159 @@ class QuizControllerTest {
     }
 
     @Test
-    void getAllMyQuizzes_whenUserHasNoQuizzes_returnsEmptyList() throws Exception {
+    void getMyQuizzes_whenUserHasNoQuizzes_returnsEmptyList() throws Exception {
         given(getQuizzesByOwnerUseCase.getMyQuizzes(any())).willReturn(List.of());
 
-        mockMvc.perform(get(QUIZZES + ApiPaths.Creator.ME)
+        mockMvc.perform(get(QUIZZES)
                         .header("Authorization", "Bearer " + tokenFor(ALICE)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isEmpty());
 
         verify(getQuizzesByOwnerUseCase).getMyQuizzes(any());
+    }
+
+    // ---------- update (PUT /quizzes/{id}) ----------
+
+    @Test
+    void updateQuiz_withoutToken_isUnauthorized() throws Exception {
+        mockMvc.perform(put(QUIZZES + "/" + UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Renamed\"}"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(updateQuizUseCase);
+    }
+
+    @Test
+    void updateQuiz_takesRequesterFromToken_andIgnoresOwnerInBody() throws Exception {
+        UUID quizId = UUID.randomUUID();
+
+        mockMvc.perform(put(QUIZZES + "/" + quizId)
+                        .header("Authorization", "Bearer " + tokenFor(ALICE))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"  Renamed Quiz  \",\"ownerId\":\"99999999-9999-9999-9999-999999999999\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(quizId.toString()))
+                .andExpect(jsonPath("$.data.name").value("Renamed Quiz"));
+
+        ArgumentCaptor<UpdateQuizCommand> captor = ArgumentCaptor.forClass(UpdateQuizCommand.class);
+        verify(updateQuizUseCase).updateQuiz(captor.capture());
+        assertThat(captor.getValue().quizId().value()).isEqualTo(quizId.toString());
+        assertThat(captor.getValue().requesterId().value()).isEqualTo(UUID.fromString(ALICE));
+        assertThat(captor.getValue().name()).isEqualTo("Renamed Quiz");
+    }
+
+    @Test
+    void updateQuiz_withBlankName_isBadRequest() throws Exception {
+        mockMvc.perform(put(QUIZZES + "/" + UUID.randomUUID())
+                        .header("Authorization", "Bearer " + tokenFor(ALICE))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"   \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Validation Failed"))
+                .andExpect(jsonPath("$.errors.name").exists());
+
+        verifyNoInteractions(updateQuizUseCase);
+    }
+
+    @Test
+    void updateQuiz_withMissingName_isBadRequest() throws Exception {
+        mockMvc.perform(put(QUIZZES + "/" + UUID.randomUUID())
+                        .header("Authorization", "Bearer " + tokenFor(ALICE))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(updateQuizUseCase);
+    }
+
+    @Test
+    void updateQuiz_withTooLongName_isBadRequest() throws Exception {
+        mockMvc.perform(put(QUIZZES + "/" + UUID.randomUUID())
+                        .header("Authorization", "Bearer " + tokenFor(ALICE))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"" + "a".repeat(256) + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(updateQuizUseCase);
+    }
+
+    @Test
+    void updateQuiz_withMalformedJson_isBadRequest() throws Exception {
+        mockMvc.perform(put(QUIZZES + "/" + UUID.randomUUID())
+                        .header("Authorization", "Bearer " + tokenFor(ALICE))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{bad"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(updateQuizUseCase);
+    }
+
+    @Test
+    void updateQuiz_withNonUuidId_isBadRequest() throws Exception {
+        mockMvc.perform(put(QUIZZES + "/not-a-uuid")
+                        .header("Authorization", "Bearer " + tokenFor(ALICE))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Renamed\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(updateQuizUseCase);
+    }
+
+    @Test
+    void updateQuiz_whenUseCaseSaysNotFound_isNotFound() throws Exception {
+        willThrow(new QuizNotFoundException(QuizId.generate())).given(updateQuizUseCase).updateQuiz(any());
+
+        mockMvc.perform(put(QUIZZES + "/" + UUID.randomUUID())
+                        .header("Authorization", "Bearer " + tokenFor(ALICE))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Renamed\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Resource Not Found"));
+    }
+
+    // ---------- delete (DELETE /quizzes/{id}) ----------
+
+    @Test
+    void deleteQuiz_withoutToken_isUnauthorized() throws Exception {
+        mockMvc.perform(delete(QUIZZES + "/" + UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(deleteQuizUseCase);
+    }
+
+    @Test
+    void deleteQuiz_returnsNoContent_andDeletesOnBehalfOfTheCaller() throws Exception {
+        UUID quizId = UUID.randomUUID();
+
+        mockMvc.perform(delete(QUIZZES + "/" + quizId)
+                        .header("Authorization", "Bearer " + tokenFor(ALICE)))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        ArgumentCaptor<DeleteQuizCommand> captor = ArgumentCaptor.forClass(DeleteQuizCommand.class);
+        verify(deleteQuizUseCase).deleteQuiz(captor.capture());
+        assertThat(captor.getValue().quizId().value()).isEqualTo(quizId.toString());
+        assertThat(captor.getValue().requesterId().value()).isEqualTo(UUID.fromString(ALICE));
+    }
+
+    @Test
+    void deleteQuiz_whenUseCaseSaysNotFound_isNotFound() throws Exception {
+        willThrow(new QuizNotFoundException(QuizId.generate())).given(deleteQuizUseCase).deleteQuiz(any());
+
+        mockMvc.perform(delete(QUIZZES + "/" + UUID.randomUUID())
+                        .header("Authorization", "Bearer " + tokenFor(ALICE)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Resource Not Found"));
+    }
+
+    @Test
+    void deleteQuiz_withNonUuidId_isBadRequest() throws Exception {
+        mockMvc.perform(delete(QUIZZES + "/not-a-uuid")
+                        .header("Authorization", "Bearer " + tokenFor(ALICE)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(deleteQuizUseCase);
     }
 
     // ---------- helpers ----------
