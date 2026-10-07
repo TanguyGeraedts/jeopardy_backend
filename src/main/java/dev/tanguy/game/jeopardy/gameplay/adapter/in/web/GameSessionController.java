@@ -1,3 +1,4 @@
+// gameplay/adapter/in/web/GameSessionController.java  (changed: create endpoint takes maxPlayers/teamCount)
 package dev.tanguy.game.jeopardy.gameplay.adapter.in.web;
 
 import dev.tanguy.game.jeopardy.common.domain.model.id.ClueId;
@@ -62,10 +63,16 @@ public class GameSessionController {
     ) {
         OwnerId requesterId = currentUser.require().ownerId();
 
+        int maxPlayers = request.maxPlayers() != null
+                ? request.maxPlayers()
+                : CreateGameSessionCommand.DEFAULT_MAX_PLAYERS;
+
         CreateGameSessionCommand command = new CreateGameSessionCommand(
                 QuizId.of(request.quizId().toString()),
                 requesterId,
-                request.mode()
+                request.mode(),
+                maxPlayers,
+                request.teamCount()
         );
         GameSessionId sessionId = createGameSessionUseCase.createGameSession(command);
 

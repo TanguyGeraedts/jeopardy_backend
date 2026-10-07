@@ -8,6 +8,11 @@ spring:
           # audiences: ${OIDC_AUDIENCE}       # strongly recommended: reject tokens meant for other apps
 
 app:
+  lobby:
+    base-url: ${LOBBY_BASE_URL}                     # e.g. https://lobby.geraedts.dev  (or http://lobby-backend:8080 inside docker)
+    launch-url: ${JEOPARDY_PUBLIC_URL}/play/{gameSessionId}
+    api-key: ${LOBBY_API_KEY:}
+    public-key-location: ${LOBBY_PUBLIC_KEY_LOCATION}   # e.g. file:/secrets/lobby-public.pem
   security:
     demo-endpoints: false
     jwt:

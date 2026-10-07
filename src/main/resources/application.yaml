@@ -1,3 +1,4 @@
+# resources/application.yaml  (changed: lobby public key)
 spring:
   application:
     name: jeopardy
@@ -21,3 +22,9 @@ spring:
       web:
         exposure:
           include: health
+
+app:
+  lobby:
+    base-url: http://localhost:3100
+    launch-url: http://localhost:3100/play/{gameSessionId}
+    public-key-location: file:./secrets/lobby-public.pem

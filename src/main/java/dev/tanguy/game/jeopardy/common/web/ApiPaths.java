@@ -11,6 +11,7 @@ public final class ApiPaths {
         public static final String BY_ID = "/{id}";
         public static final String ANSWER = BY_ID + "/answer";
         public static final String JOIN = BY_ID + "/join";
+        public static final String HANDOFF = BY_ID + "/handoff";
     }
 
     public static final class Creator {

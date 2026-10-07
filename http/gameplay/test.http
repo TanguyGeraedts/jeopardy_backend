@@ -1,0 +1,103 @@
+@baseUrl = http://localhost:8080
+@lobbyUrl = http://localhost:3100
+@quizId = 30000000-0000-0000-0000-000000000001
+
+### 0. Creator token
+POST {{baseUrl}}/api/public/mock-auth/token
+Content-Type: application/json
+
+{}
+
+> {%
+    client.global.set("token", response.body.access_token);
+%}
+
+
+### 1. Create a TEAM game session (creates the real lobby)
+POST {{baseUrl}}/api/v1/game-sessions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "quizId": "{{quizId}}", "mode": "TEAM", "teamCount": 2, "maxPlayers": 4 }
+
+> {%
+    client.global.set("sessionId", response.body.data.gameSessionId);
+%}
+
+
+### 2. Read the lobby code
+GET {{baseUrl}}/api/v1/game-sessions/{{sessionId}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.global.set("lobbyCode", response.body.data.lobbyCode);
+    client.test("has a lobby code", function() {
+        client.assert(response.body.data.lobbyCode);
+    });
+%}
+
+
+### 3. Quiz master joins the lobby FIRST, so becomes host
+POST {{lobbyUrl}}/api/v1/lobbies/{{lobbyCode}}/join
+Content-Type: application/json
+
+{ "username": "QuizMaster" }
+
+> {%
+    client.global.set("hostToken", response.body.sessionToken);
+    client.test("is host", function() {
+        client.assert(response.body.player.role === "HOST");
+    });
+%}
+
+
+### 4a. Player Alice joins
+POST {{lobbyUrl}}/api/v1/lobbies/{{lobbyCode}}/join
+Content-Type: application/json
+
+{ "username": "Alice" }
+
+### 4b. Player Bob joins
+POST {{lobbyUrl}}/api/v1/lobbies/{{lobbyCode}}/join
+Content-Type: application/json
+
+{ "username": "Bob" }
+
+
+### 5. Host starts the lobby, gets the signed handoff token
+POST {{lobbyUrl}}/api/v1/lobbies/{{lobbyCode}}/start
+Authorization: Bearer {{hostToken}}
+
+> {%
+    client.global.set("handoffToken", response.body.token);
+%}
+
+
+### 6. Hand it to Jeopardy: players imported, game starts
+POST {{baseUrl}}/api/v1/game-sessions/{{sessionId}}/handoff
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "token": "{{handoffToken}}" }
+
+> {%
+    client.test("started, host not imported", function() {
+        client.assert(response.status === 200);
+        client.assert(response.body.data.state === "BOARD_SELECTION");
+        client.assert(response.body.data.players.length === 2);
+    });
+%}
+
+
+### 7. Replaying the same handoff must be refused
+POST {{baseUrl}}/api/v1/game-sessions/{{sessionId}}/handoff
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "token": "{{handoffToken}}" }
+
+> {%
+    client.test("409 on replay", function() {
+        client.assert(response.status === 409);
+    });
+%}

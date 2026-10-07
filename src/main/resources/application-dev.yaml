@@ -3,7 +3,7 @@ app:
     demo-endpoints: true
     mock:
       issuer: http://localhost:8080/mock-issuer
-      secret: ${MOCK_JWT_SECRET:dev-only-secret-change-me-at-least-32-bytes!!}
+      secret: 3KF3rHgvUQ7MWuAG5Wq/Hg4530WcsOe4gK1c+uF93luYjQCalkmDXbM8TafTBzw8 #PUT IN GIT LATER (TEMP KEY)
       ttl: 1h
     jwt:
       roles-claim-paths: [roles]

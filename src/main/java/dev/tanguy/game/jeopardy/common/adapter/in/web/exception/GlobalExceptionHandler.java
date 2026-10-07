@@ -1,6 +1,7 @@
 package dev.tanguy.game.jeopardy.common.adapter.in.web.exception;
 
 import dev.tanguy.game.jeopardy.common.domain.exception.DomainConflictException;
+import dev.tanguy.game.jeopardy.common.domain.exception.ExternalServiceException;
 import dev.tanguy.game.jeopardy.common.domain.exception.InvalidValueException;
 import dev.tanguy.game.jeopardy.common.domain.exception.NotFoundException;
 import org.springframework.http.HttpStatus;
@@ -123,6 +124,15 @@ public class GlobalExceptionHandler {
                 "An unexpected error occurred."
         );
         problem.setTitle("Internal Server Error");
+        problem.setType(BLANK_TYPE);
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    @ExceptionHandler(ExternalServiceException.class)
+    public ProblemDetail handleExternalService(ExternalServiceException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, ex.getMessage());
+        problem.setTitle("Upstream Service Failed");
         problem.setType(BLANK_TYPE);
         problem.setProperty("timestamp", Instant.now());
         return problem;

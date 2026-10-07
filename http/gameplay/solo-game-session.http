@@ -1,5 +1,9 @@
 @baseUrl = http://localhost:8080
+@lobbyUrl = http://localhost:3100
 @quizId = 30000000-0000-0000-0000-000000000001
+# Paste the lobby HOST's sessionToken here (from the "join" response in your browser's dev tools) before step 4.
+#@hostToken = PASTE_HOST_SESSION_TOKEN_HERE
+@hostToken = eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJsb2JieS1zZXJ2aWNlIiwiYXVkIjpbImxvYmJ5LXBsYXllciJdLCJzdWIiOiI3NDc2ODljYy0xMTU1LTRlMDgtODIxYS00ZTNmODZkZDNiMzUiLCJsb2JieUNvZGUiOiI3QzNGNUUiLCJpYXQiOjE3OTE0MTU0MDcsImV4cCI6MTc5MTQyMjYwN30.RvfH-DTHgrt8Fq4K_XQeV0dXHVHn3_GlMHzk7r3eWOP6r0Q8-3d7yMDklyOGSlGJSff9w1EYtGWtGnrFwgUHXjntfbDrB0Kt_niH7TzJg1nDTK7p8toQIEwRrKmkY1hqdiQbOLUq9XnKV8aNGYmfYOlqjEkyKp5WjmBKgd4DsAQ8pb_eUTI3eixt-WZIT3N5CgWdto-gHT32U4X_U217IqRa4_9XDq9flHGKi16ZhMAKOm5QwSMCcHhqZALAs98S11mnn9zMbExOWFb8VkmSTSyUkPSUXv5EyLdCU5Ya0vrQ1oygfQ09G9DxAo1CjJbY2bn4krz2P2acKUIR5SN_tg
 
 ### 0. Get a dev token (owner of the seed quizzes). Run this first.
 POST {{baseUrl}}/api/public/mock-auth/token
@@ -15,14 +19,15 @@ Content-Type: application/json
 %}
 
 
-### 1. Create a SOLO game session from the quiz
+### 1. Create a SOLO game session from the quiz (also creates the lobby; no teamCount for solo)
 POST {{baseUrl}}/api/v1/game-sessions
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "quizId": "{{quizId}}",
-  "mode": "SOLO"
+  "mode": "SOLO",
+  "maxPlayers": 4
 }
 
 > {%
@@ -33,121 +38,106 @@ Content-Type: application/json
 %}
 
 
-### 2. Get the session: board was copied from the quiz and persisted
+### 2. Get the session: board was copied from the quiz, lobby code assigned
 GET {{baseUrl}}/api/v1/game-sessions/{{soloSessionId}}
 Authorization: Bearer {{token}}
 Accept: application/json
 
 > {%
-    client.test("SOLO game in LOBBY with a board", function() {
+    client.global.set("lobbyCode", response.body.data.lobbyCode);
+    client.log("Join this lobby in your browser: " + client.global.get("lobbyCode") + "  (lobby: " + "http://localhost:3100" + ")");
+    client.test("SOLO game in LOBBY with a board and a lobby code", function() {
         client.assert(response.body.data.mode === "SOLO");
         client.assert(response.body.data.state === "LOBBY");
+        client.assert(response.body.data.lobbyCode);
         client.assert(response.body.data.clues.length > 0);
         client.assert(response.body.data.clues[0].category);
     });
 %}
 
 
-### 3. Join player 1 (no team: a solo team is created automatically)
-POST {{baseUrl}}/api/v1/game-sessions/{{soloSessionId}}/join
-Authorization: Bearer {{token}}
-Content-Type: application/json
+### 3. MANUAL: join the lobby in your browser (no request to run here)
+# 1. Open {{lobbyUrl}} and join the lobby with the code logged by step 2 (also: GET the session and read "lobbyCode").
+# 2. The first player to join is the lobby host. Have the other players join too.
+# 3. In the HOST's browser dev tools (F12 > Network), open that player's "join" request and copy "sessionToken" from its response.
+# 4. Paste it into @hostToken at the top of this file, then run step 4.
 
-{
-  "playerId": "c64bb9bf-1ccc-46cc-a82f-9643fee38013",
-  "playerName": "Tanguy",
-  "externalTeamId": null,
-  "teamName": null,
-  "teamColour": null
-}
+
+### 4. Start the lobby as the host: returns the signed handoff token (valid 5 minutes)
+POST {{lobbyUrl}}/api/v1/lobbies/{{lobbyCode}}/start
+Authorization: Bearer {{hostToken}}
 
 > {%
-    client.global.set("soloTeam1Id", response.body.data.teamId);
-    client.test("joined with an auto-created team", function() {
-        client.assert(response.status === 201);
-    });
-%}
-
-
-### 4. Join player 2: gets their own team
-POST {{baseUrl}}/api/v1/game-sessions/{{soloSessionId}}/join
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "playerId": "188e376d-fb1a-428c-9739-8f5e24705424",
-  "playerName": "player2",
-  "externalTeamId": null,
-  "teamName": null,
-  "teamColour": null
-}
-
-> {%
-    client.test("different team than player 1", function() {
-        client.assert(response.status === 201);
-        client.assert(response.body.data.teamId !== client.global.get("soloTeam1Id"));
-    });
-%}
-
-
-### 5. Re-join player 1 (page refresh): idempotent, 200 not 201
-POST {{baseUrl}}/api/v1/game-sessions/{{soloSessionId}}/join
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "playerId": "c64bb9bf-1ccc-46cc-a82f-9643fee38013",
-  "playerName": "Tanguy",
-  "externalTeamId": null,
-  "teamName": null,
-  "teamColour": null
-}
-
-> {%
-    client.test("idempotent re-join", function() {
+    client.global.set("handoffToken", response.body.token);
+    client.test("lobby started, got a handoff token", function() {
         client.assert(response.status === 200);
-        client.assert(response.body.data.alreadyJoined === true);
+        client.assert(response.body.token);
     });
 %}
 
 
-### 6. Join a solo game WITH a team: rejected
-POST {{baseUrl}}/api/v1/game-sessions/{{soloSessionId}}/join
-Authorization: Bearer {{token}}
+### 5. Hand the token to Jeopardy: players imported, game starts
+POST {{baseUrl}}/api/v1/game-sessions/{{soloSessionId}}/handoff
 Content-Type: application/json
 
-{
-  "playerId": "f67ba636-ce42-40cc-9f86-3fc26781f811",
-  "playerName": "Player3",
-  "externalTeamId": "1",
-  "teamName": "Team 1",
-  "teamColour": "RED"
-}
+{ "token": "{{handoffToken}}" }
 
 > {%
-    client.test("rejected with 409, solo game", function() {
-        client.assert(response.status === 409);
-        client.assert(response.body.detail.includes("solo game"));
+    client.test("started, lobby players imported", function() {
+        client.assert(response.status === 200);
+        client.assert(response.body.data.state === "BOARD_SELECTION");
+        client.assert(response.body.data.players.length >= 1);
     });
 %}
 
 
-### 7. Get again: 2 players, 2 teams (proves joins were persisted)
+### 6. Replaying the same handoff must be refused
+POST {{baseUrl}}/api/v1/game-sessions/{{soloSessionId}}/handoff
+Content-Type: application/json
+
+{ "token": "{{handoffToken}}" }
+
+> {%
+    client.test("409 on replay", function() {
+        client.assert(response.status === 409);
+    });
+%}
+
+
+### 7. Get again: everyone who joined the lobby was imported and persisted
 GET {{baseUrl}}/api/v1/game-sessions/{{soloSessionId}}
 Authorization: Bearer {{token}}
 Accept: application/json
 
 > {%
-    client.test("2 players, 2 solo teams", function() {
-        client.assert(response.body.data.players.length === 2);
-        client.assert(response.body.data.teams.length === 2);
+    client.test("lobby players imported and persisted", function() {
+        client.assert(response.body.data.players.length >= 1);
+        client.assert(response.body.data.teams.length === response.body.data.players.length);
     });
 %}
 
 
 ### ---------- Negative cases for create ----------
 
-### 8. Quiz that doesn't exist (or isn't yours): 404
+### 8. SOLO game with a teamCount: 400
+POST {{baseUrl}}/api/v1/game-sessions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "quizId": "{{quizId}}",
+  "mode": "SOLO",
+  "teamCount": 2
+}
+
+> {%
+    client.test("400 for solo with teams", function() {
+        client.assert(response.status === 400);
+    });
+%}
+
+
+### 9. Quiz that doesn't exist (or isn't yours): 404
 POST {{baseUrl}}/api/v1/game-sessions
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -164,7 +154,7 @@ Content-Type: application/json
 %}
 
 
-### 9. Invalid mode: 400
+### 10. Invalid mode: 400
 POST {{baseUrl}}/api/v1/game-sessions
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -181,7 +171,7 @@ Content-Type: application/json
 %}
 
 
-### 10. Missing quizId: 400 with validation errors
+### 11. Missing quizId: 400 with validation errors
 POST {{baseUrl}}/api/v1/game-sessions
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -197,7 +187,25 @@ Content-Type: application/json
 %}
 
 
-### 11. No token: 401
+### 12. maxPlayers out of range: 400
+POST {{baseUrl}}/api/v1/game-sessions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "quizId": "{{quizId}}",
+  "mode": "SOLO",
+  "maxPlayers": 0
+}
+
+> {%
+    client.test("400 for maxPlayers < 1", function() {
+        client.assert(response.status === 400);
+    });
+%}
+
+
+### 13. No token: 401
 POST {{baseUrl}}/api/v1/game-sessions
 Content-Type: application/json
 
@@ -213,7 +221,7 @@ Content-Type: application/json
 %}
 
 
-### 12. Someone else's token can't use your quiz: 404
+### 14. Someone else's token can't use your quiz: 404
 POST {{baseUrl}}/api/public/mock-auth/token
 Content-Type: application/json
 

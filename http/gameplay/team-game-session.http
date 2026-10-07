@@ -1,5 +1,8 @@
 @baseUrl = http://localhost:8080
+@lobbyUrl = http://localhost:3100
 @quizId = 30000000-0000-0000-0000-000000000001
+# Paste the lobby HOST's sessionToken here (from the "join" response in your browser's dev tools) before step 4.
+@hostToken = PASTE_HOST_SESSION_TOKEN_HERE
 
 ### 0. Get a dev token (owner of the seed quizzes). Run this first.
 POST {{baseUrl}}/api/public/mock-auth/token
@@ -15,14 +18,16 @@ Content-Type: application/json
 %}
 
 
-### 1. Create a TEAM game session from the quiz
+### 1. Create a TEAM game session from the quiz (also creates the lobby; teamCount is required)
 POST {{baseUrl}}/api/v1/game-sessions
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "quizId": "{{quizId}}",
-  "mode": "TEAM"
+  "mode": "TEAM",
+  "teamCount": 2,
+  "maxPlayers": 4
 }
 
 > {%
@@ -33,120 +38,87 @@ Content-Type: application/json
 %}
 
 
-### 2. Get the session: board was copied from the quiz and persisted
+### 2. Get the session: board was copied from the quiz, lobby code assigned
 GET {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}
 Authorization: Bearer {{token}}
 Accept: application/json
 
 > {%
+    client.global.set("lobbyCode", response.body.data.lobbyCode);
+    client.log("Join this lobby in your browser: " + client.global.get("lobbyCode") + "  (lobby: " + "http://localhost:3100" + ")");
     client.global.set("clueId", response.body.data.clues[0].id);
-    client.test("TEAM game in LOBBY with a board", function() {
+    client.test("TEAM game in LOBBY with a board and a lobby code", function() {
         client.assert(response.body.data.mode === "TEAM");
         client.assert(response.body.data.state === "LOBBY");
+        client.assert(response.body.data.lobbyCode);
         client.assert(response.body.data.clues.length > 0);
         client.assert(response.body.data.clues[0].category);
     });
 %}
 
 
-### 3. Join host onto Team 1
-POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/join
-Authorization: Bearer {{token}}
-Content-Type: application/json
+### 3. MANUAL: join the lobby in your browser (no request to run here)
+# 1. Open {{lobbyUrl}} and join the lobby with the code logged by step 2 (also: GET the session and read "lobbyCode").
+# 2. The first player to join is the lobby host. Have the other players join too.
+# 3. In the HOST's browser dev tools (F12 > Network), open that player's "join" request and copy "sessionToken" from its response.
+# 4. Paste it into @hostToken at the top of this file, then run step 4.
 
-{
-  "playerId": "c64bb9bf-1ccc-46cc-a82f-9643fee38013",
-  "playerName": "Tanguy",
-  "externalTeamId": "1",
-  "teamName": "Team 1",
-  "teamColour": "RED"
-}
+
+### 4. Start the lobby as the host: returns the signed handoff token (valid 5 minutes)
+POST {{lobbyUrl}}/api/v1/lobbies/{{lobbyCode}}/start
+Authorization: Bearer {{hostToken}}
 
 > {%
-    client.global.set("team1Id", response.body.data.teamId);
-    client.test("created onto Team 1", function() {
-        client.assert(response.status === 201);
-    });
-%}
-
-
-### 4. Join player2 onto the same Team 1
-POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/join
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "playerId": "188e376d-fb1a-428c-9739-8f5e24705424",
-  "playerName": "player2",
-  "externalTeamId": "1",
-  "teamName": "Team 1",
-  "teamColour": "RED"
-}
-
-> {%
-    client.test("correlates onto the same domain team", function() {
-        client.assert(response.body.data.teamId === client.global.get("team1Id"));
-    });
-%}
-
-
-### 5. Re-join the host (page refresh): idempotent, 200 not 201
-POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/join
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "playerId": "c64bb9bf-1ccc-46cc-a82f-9643fee38013",
-  "playerName": "Tanguy",
-  "externalTeamId": "1",
-  "teamName": "Team 1",
-  "teamColour": "RED"
-}
-
-> {%
-    client.test("idempotent re-join", function() {
+    client.global.set("handoffToken", response.body.token);
+    client.test("lobby started, got a handoff token", function() {
         client.assert(response.status === 200);
-        client.assert(response.body.data.alreadyJoined === true);
+        client.assert(response.body.token);
     });
 %}
 
 
-### 6. Join a team game without a team: rejected
-POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/join
-Authorization: Bearer {{token}}
+### 5. Hand the token to Jeopardy: players imported, game starts
+POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/handoff
 Content-Type: application/json
 
-{
-  "playerId": "f67ba636-ce42-40cc-9f86-3fc26781f811",
-  "playerName": "Player3",
-  "externalTeamId": null,
-  "teamName": null,
-  "teamColour": null
-}
+{ "token": "{{handoffToken}}" }
 
 > {%
-    client.test("rejected with 409, team required", function() {
-        client.assert(response.status === 409);
-        client.assert(response.body.detail.includes("team game"));
+    client.test("started, lobby players imported", function() {
+        client.assert(response.status === 200);
+        client.assert(response.body.data.state === "BOARD_SELECTION");
+        client.assert(response.body.data.players.length >= 1);
     });
 %}
 
 
-### 7. Get again: 2 players, 1 team (proves joins were persisted)
+### 6. Replaying the same handoff must be refused
+POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/handoff
+Content-Type: application/json
+
+{ "token": "{{handoffToken}}" }
+
+> {%
+    client.test("409 on replay", function() {
+        client.assert(response.status === 409);
+    });
+%}
+
+
+### 7. Get again: everyone who joined the lobby was imported and persisted
 GET {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}
 Authorization: Bearer {{token}}
 Accept: application/json
 
 > {%
-    client.test("2 players on 1 team", function() {
-        client.assert(response.body.data.players.length === 2);
-        client.assert(response.body.data.teams.length === 1);
-        client.assert(response.body.data.teams[0].memberIds.length === 2);
+    client.test("lobby players imported and persisted", function() {
+        client.assert(response.body.data.players.length >= 1);
+        client.assert(response.body.data.teams.length > 0);
     });
 %}
 
 
-### 8. Answer a clue: no startGame endpoint yet, so there is no active clue
+### 8. Answer a clue: state is BOARD_SELECTION so no active clue is selected yet
 POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/answer
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -157,7 +129,44 @@ Content-Type: application/json
 }
 
 > {%
-    client.test("rejected while still in LOBBY", function() {
+    client.test("rejected when no active clue selected", function() {
         client.assert(response.status === 404);
+    });
+%}
+
+
+### ---------- Negative cases for create ----------
+
+### 9. TEAM game without teamCount: 400
+POST {{baseUrl}}/api/v1/game-sessions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "quizId": "{{quizId}}",
+  "mode": "TEAM"
+}
+
+> {%
+    client.test("400, team game needs teamCount", function() {
+        client.assert(response.status === 400);
+    });
+%}
+
+
+### 10. teamCount below the minimum of 2: 400
+POST {{baseUrl}}/api/v1/game-sessions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "quizId": "{{quizId}}",
+  "mode": "TEAM",
+  "teamCount": 1
+}
+
+> {%
+    client.test("400 for teamCount < 2", function() {
+        client.assert(response.status === 400);
     });
 %}
