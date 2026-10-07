@@ -3,7 +3,7 @@
 @quizId = 30000000-0000-0000-0000-000000000001
 # Paste the lobby HOST's sessionToken here (from the "join" response in your browser's dev tools) before step 4.
 #@hostToken = PASTE_HOST_SESSION_TOKEN_HERE
-@hostToken = eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJsb2JieS1zZXJ2aWNlIiwiYXVkIjpbImxvYmJ5LXBsYXllciJdLCJzdWIiOiI3NDc2ODljYy0xMTU1LTRlMDgtODIxYS00ZTNmODZkZDNiMzUiLCJsb2JieUNvZGUiOiI3QzNGNUUiLCJpYXQiOjE3OTE0MTU0MDcsImV4cCI6MTc5MTQyMjYwN30.RvfH-DTHgrt8Fq4K_XQeV0dXHVHn3_GlMHzk7r3eWOP6r0Q8-3d7yMDklyOGSlGJSff9w1EYtGWtGnrFwgUHXjntfbDrB0Kt_niH7TzJg1nDTK7p8toQIEwRrKmkY1hqdiQbOLUq9XnKV8aNGYmfYOlqjEkyKp5WjmBKgd4DsAQ8pb_eUTI3eixt-WZIT3N5CgWdto-gHT32U4X_U217IqRa4_9XDq9flHGKi16ZhMAKOm5QwSMCcHhqZALAs98S11mnn9zMbExOWFb8VkmSTSyUkPSUXv5EyLdCU5Ya0vrQ1oygfQ09G9DxAo1CjJbY2bn4krz2P2acKUIR5SN_tg
+@hostToken = eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJsb2JieS1zZXJ2aWNlIiwiYXVkIjpbImxvYmJ5LXBsYXllciJdLCJzdWIiOiI0YWM1MjdmOC0yMTdkLTQ3ZjItODViYi0zZTlkOWU5NmQ3ODgiLCJsb2JieUNvZGUiOiI3ODg2MzEiLCJpYXQiOjE3OTE0MTY0MTcsImV4cCI6MTc5MTQyMzYxN30.DvHxKJHaZXYNfqh92kismNJ0PpfUsyhVjnQ6pFiCJ3fPhC1LssMphZA6ziz-d4TBRrG2Q-sPHFKtmJ-HMmv19aZynkY3C5rh-FJmB6pHvPmXsDAXcL_4Cf-Cl91Svhbc4XvRWK3KzvM1LCeCfAElocbuS8QCgemQJ8rymLg1D-ZIfmJuRe455iHIyMOaTxXLMQd5xmSBJz0itJR205op1sc6uChlvIBZlB8A2GcgzhvKHsBfNN8Xx5U__96kiJGRS_xN1txesujWySAERBtznOPXKTciC97K-Lr87DErwzIJO5HcZK9Hd-1K3Hfx18E-MGm0Zz3I5Ewwg9m4UBUgGQ
 
 ### 0. Get a dev token (owner of the seed quizzes). Run this first.
 POST {{baseUrl}}/api/public/mock-auth/token
@@ -64,7 +64,8 @@ Accept: application/json
 
 
 ### 4. Start the lobby as the host: returns the signed handoff token (valid 5 minutes)
-POST {{lobbyUrl}}/api/v1/lobbies/{{lobbyCode}}/start
+#POST {{lobbyUrl}}/api/v1/lobbies/{{lobbyCode}}/start
+POST {{lobbyUrl}}/api/v1/lobbies/788631/start
 Authorization: Bearer {{hostToken}}
 
 > {%
@@ -77,7 +78,8 @@ Authorization: Bearer {{hostToken}}
 
 
 ### 5. Hand the token to Jeopardy: players imported, game starts
-POST {{baseUrl}}/api/v1/game-sessions/{{soloSessionId}}/handoff
+#POST {{baseUrl}}/api/v1/game-sessions/{{soloSessionId}}/handoff
+POST {{baseUrl}}/api/v1/game-sessions/5a897766-354c-4b02-9807-4c248eb7f376/handoff
 Content-Type: application/json
 
 { "token": "{{handoffToken}}" }
