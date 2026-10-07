@@ -1,20 +1,57 @@
 @baseUrl = http://localhost:8080
+@quizId = 30000000-0000-0000-0000-000000000001
 
-### Create a TEAM game session
+### 0. Get a dev token (owner of the seed quizzes). Run this first.
+POST {{baseUrl}}/api/public/mock-auth/token
+Content-Type: application/json
+
+{}
+
+> {%
+    client.global.set("token", response.body.access_token);
+    client.test("got a token", function() {
+        client.assert(response.status === 200);
+    });
+%}
+
+
+### 1. Create a TEAM game session from the quiz
 POST {{baseUrl}}/api/v1/game-sessions
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "boardId": "board-dummy-01",
-  "teamGame": true
+  "quizId": "{{quizId}}",
+  "mode": "TEAM"
 }
 
 > {%
     client.global.set("teamSessionId", response.body.data.gameSessionId);
+    client.test("created", function() {
+        client.assert(response.status === 201);
+    });
 %}
 
-### Join host onto Team 1
+
+### 2. Get the session: board was copied from the quiz and persisted
+GET {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}
+Authorization: Bearer {{token}}
+Accept: application/json
+
+> {%
+    client.global.set("clueId", response.body.data.clues[0].id);
+    client.test("TEAM game in LOBBY with a board", function() {
+        client.assert(response.body.data.mode === "TEAM");
+        client.assert(response.body.data.state === "LOBBY");
+        client.assert(response.body.data.clues.length > 0);
+        client.assert(response.body.data.clues[0].category);
+    });
+%}
+
+
+### 3. Join host onto Team 1
 POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/join
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -32,8 +69,10 @@ Content-Type: application/json
     });
 %}
 
-### Join player2 onto the same Team 1
+
+### 4. Join player2 onto the same Team 1
 POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/join
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -50,8 +89,10 @@ Content-Type: application/json
     });
 %}
 
-### Re-join the host (page refresh) — idempotent, 200 not 201
+
+### 5. Re-join the host (page refresh): idempotent, 200 not 201
 POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/join
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -69,8 +110,10 @@ Content-Type: application/json
     });
 %}
 
-### Attempt a SOLO join into a TEAM game — should be rejected
+
+### 6. Join a team game without a team: rejected
 POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/join
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -82,28 +125,39 @@ Content-Type: application/json
 }
 
 > {%
-    client.test("rejected with 409 — team required", function() {
+    client.test("rejected with 409, team required", function() {
         client.assert(response.status === 409);
         client.assert(response.body.detail.includes("team game"));
     });
 %}
 
-### Get the team session
+
+### 7. Get again: 2 players, 1 team (proves joins were persisted)
 GET {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}
+Authorization: Bearer {{token}}
 Accept: application/json
 
 > {%
-    client.global.set("clueId", response.body.data.clues[0].id);
-    client.test("mode is TEAM, 2 members on Team 1", function() {
-        client.assert(response.body.data.mode === "TEAM");
+    client.test("2 players on 1 team", function() {
+        client.assert(response.body.data.players.length === 2);
+        client.assert(response.body.data.teams.length === 1);
+        client.assert(response.body.data.teams[0].memberIds.length === 2);
     });
 %}
 
-### Answer a clue — still 409, session stuck in LOBBY (no startGame endpoint yet)
+
+### 8. Answer a clue: no startGame endpoint yet, so there is no active clue
 POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/answer
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "clueId": "{{clueId}}",
-  "answer": "A programming language"
+  "answer": "anything"
 }
+
+> {%
+    client.test("rejected while still in LOBBY", function() {
+        client.assert(response.status === 404);
+    });
+%}

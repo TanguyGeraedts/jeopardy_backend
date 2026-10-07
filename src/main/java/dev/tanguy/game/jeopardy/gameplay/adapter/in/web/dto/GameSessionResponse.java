@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record GameSessionResponse(
         UUID id,
+        String lobbyCode,
         String state,
         String mode,
         List<ClueSummary> clues,
@@ -12,7 +13,7 @@ public record GameSessionResponse(
         List<PlayerSummary> players
 ) {
     public record ClueSummary(
-            String id, int value, String question, boolean revealed, boolean dailyDouble, String answer
+            String id, String category, int value, String question, boolean revealed, boolean dailyDouble, String answer
     ) {}
 
     public record TeamSummary(

@@ -1,67 +1,106 @@
 @baseUrl = http://localhost:8080
+@quizId = 30000000-0000-0000-0000-000000000001
 
-
-### Create a TEAM game session
-POST {{baseUrl}}/api/v1/game-sessions
+### 0. Get a dev token (owner of the seed quizzes). Run this first.
+POST {{baseUrl}}/api/public/mock-auth/token
 Content-Type: application/json
 
-{
-  "boardId": "board-dummy-01",
-  "teamGame": true
-}
+{}
 
 > {%
-    client.global.set("teamSessionId", response.body.data.gameSessionId);
+    client.global.set("token", response.body.access_token);
+    client.test("got a token", function() {
+        client.assert(response.status === 200);
+    });
 %}
 
 
-### Join host onto Team 1
-POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/join
+### 1. Create a SOLO game session from the quiz
+POST {{baseUrl}}/api/v1/game-sessions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "quizId": "{{quizId}}",
+  "mode": "SOLO"
+}
+
+> {%
+    client.global.set("soloSessionId", response.body.data.gameSessionId);
+    client.test("created", function() {
+        client.assert(response.status === 201);
+    });
+%}
+
+
+### 2. Get the session: board was copied from the quiz and persisted
+GET {{baseUrl}}/api/v1/game-sessions/{{soloSessionId}}
+Authorization: Bearer {{token}}
+Accept: application/json
+
+> {%
+    client.test("SOLO game in LOBBY with a board", function() {
+        client.assert(response.body.data.mode === "SOLO");
+        client.assert(response.body.data.state === "LOBBY");
+        client.assert(response.body.data.clues.length > 0);
+        client.assert(response.body.data.clues[0].category);
+    });
+%}
+
+
+### 3. Join player 1 (no team: a solo team is created automatically)
+POST {{baseUrl}}/api/v1/game-sessions/{{soloSessionId}}/join
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "playerId": "c64bb9bf-1ccc-46cc-a82f-9643fee38013",
   "playerName": "Tanguy",
-  "externalTeamId": "1",
-  "teamName": "Team 1",
-  "teamColour": "RED"
+  "externalTeamId": null,
+  "teamName": null,
+  "teamColour": null
 }
 
 > {%
-    client.global.set("team1Id", response.body.data.teamId);
-    client.test("created onto Team 1", function() {
+    client.global.set("soloTeam1Id", response.body.data.teamId);
+    client.test("joined with an auto-created team", function() {
         client.assert(response.status === 201);
     });
 %}
 
-### Join player2 onto the same Team 1
-POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/join
+
+### 4. Join player 2: gets their own team
+POST {{baseUrl}}/api/v1/game-sessions/{{soloSessionId}}/join
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "playerId": "188e376d-fb1a-428c-9739-8f5e24705424",
   "playerName": "player2",
-  "externalTeamId": "1",
-  "teamName": "Team 1",
-  "teamColour": "RED"
+  "externalTeamId": null,
+  "teamName": null,
+  "teamColour": null
 }
 
 > {%
-    client.test("correlates onto the same domain team", function() {
-        client.assert(response.body.data.teamId === client.global.get("team1Id"));
+    client.test("different team than player 1", function() {
+        client.assert(response.status === 201);
+        client.assert(response.body.data.teamId !== client.global.get("soloTeam1Id"));
     });
 %}
 
-### Re-join the host (page refresh) — idempotent, 200 not 201
-POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/join
+
+### 5. Re-join player 1 (page refresh): idempotent, 200 not 201
+POST {{baseUrl}}/api/v1/game-sessions/{{soloSessionId}}/join
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "playerId": "c64bb9bf-1ccc-46cc-a82f-9643fee38013",
   "playerName": "Tanguy",
-  "externalTeamId": "1",
-  "teamName": "Team 1",
-  "teamColour": "RED"
+  "externalTeamId": null,
+  "teamName": null,
+  "teamColour": null
 }
 
 > {%
@@ -71,41 +110,131 @@ Content-Type: application/json
     });
 %}
 
-### Attempt a SOLO join into a TEAM game — should be rejected
-POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/join
+
+### 6. Join a solo game WITH a team: rejected
+POST {{baseUrl}}/api/v1/game-sessions/{{soloSessionId}}/join
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "playerId": "f67ba636-ce42-40cc-9f86-3fc26781f811",
   "playerName": "Player3",
-  "externalTeamId": null,
-  "teamName": null,
-  "teamColour": null
+  "externalTeamId": "1",
+  "teamName": "Team 1",
+  "teamColour": "RED"
 }
 
 > {%
-    client.test("rejected with 409 — team required", function() {
+    client.test("rejected with 409, solo game", function() {
         client.assert(response.status === 409);
-        client.assert(response.body.detail.includes("team game"));
+        client.assert(response.body.detail.includes("solo game"));
     });
 %}
 
-### Get the team session
-GET {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}
+
+### 7. Get again: 2 players, 2 teams (proves joins were persisted)
+GET {{baseUrl}}/api/v1/game-sessions/{{soloSessionId}}
+Authorization: Bearer {{token}}
 Accept: application/json
 
 > {%
-    client.global.set("clueId", response.body.data.clues[0].id);
-    client.test("mode is TEAM, 2 members on Team 1", function() {
-        client.assert(response.body.data.mode === "TEAM");
+    client.test("2 players, 2 solo teams", function() {
+        client.assert(response.body.data.players.length === 2);
+        client.assert(response.body.data.teams.length === 2);
     });
 %}
 
-### Answer a clue — still 409, session stuck in LOBBY (no startGame endpoint yet)
-POST {{baseUrl}}/api/v1/game-sessions/{{teamSessionId}}/answer
+
+### ---------- Negative cases for create ----------
+
+### 8. Quiz that doesn't exist (or isn't yours): 404
+POST {{baseUrl}}/api/v1/game-sessions
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "clueId": "{{clueId}}",
-  "answer": "A programming language"
+  "quizId": "99999999-9999-9999-9999-999999999999",
+  "mode": "SOLO"
 }
+
+> {%
+    client.test("404 for unknown quiz", function() {
+        client.assert(response.status === 404);
+    });
+%}
+
+
+### 9. Invalid mode: 400
+POST {{baseUrl}}/api/v1/game-sessions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "quizId": "{{quizId}}",
+  "mode": "BATTLE_ROYALE"
+}
+
+> {%
+    client.test("400 for invalid mode", function() {
+        client.assert(response.status === 400);
+    });
+%}
+
+
+### 10. Missing quizId: 400 with validation errors
+POST {{baseUrl}}/api/v1/game-sessions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "mode": "SOLO"
+}
+
+> {%
+    client.test("400 validation failed", function() {
+        client.assert(response.status === 400);
+    });
+%}
+
+
+### 11. No token: 401
+POST {{baseUrl}}/api/v1/game-sessions
+Content-Type: application/json
+
+{
+  "quizId": "{{quizId}}",
+  "mode": "SOLO"
+}
+
+> {%
+    client.test("401 without a token", function() {
+        client.assert(response.status === 401);
+    });
+%}
+
+
+### 12. Someone else's token can't use your quiz: 404
+POST {{baseUrl}}/api/public/mock-auth/token
+Content-Type: application/json
+
+{ "sub": "11111111-1111-1111-1111-111111111111" }
+
+> {%
+    client.global.set("otherToken", response.body.access_token);
+%}
+
+###
+POST {{baseUrl}}/api/v1/game-sessions
+Authorization: Bearer {{otherToken}}
+Content-Type: application/json
+
+{
+  "quizId": "{{quizId}}",
+  "mode": "SOLO"
+}
+
+> {%
+    client.test("404 for a quiz owned by someone else", function() {
+        client.assert(response.status === 404);
+    });
+%}

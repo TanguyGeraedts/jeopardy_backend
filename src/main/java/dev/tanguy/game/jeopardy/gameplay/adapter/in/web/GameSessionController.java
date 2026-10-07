@@ -2,7 +2,10 @@ package dev.tanguy.game.jeopardy.gameplay.adapter.in.web;
 
 import dev.tanguy.game.jeopardy.common.domain.model.id.ClueId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.GameSessionId;
+import dev.tanguy.game.jeopardy.common.domain.model.id.OwnerId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.PlayerId;
+import dev.tanguy.game.jeopardy.common.domain.model.id.QuizId;
+import dev.tanguy.game.jeopardy.common.infrastructure.security.CurrentUser;
 import dev.tanguy.game.jeopardy.common.web.ApiPaths;
 import dev.tanguy.game.jeopardy.common.web.ApiResponse;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.AnswerClueRequest;
@@ -13,7 +16,6 @@ import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.GameSessionResponse;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.JoinGameSessionRequest;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.JoinGameSessionResponse;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.mapper.GameSessionResponseMapper;
-import dev.tanguy.game.jeopardy.gameplay.domain.model.GameMode;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.GameSession;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.AddPlayerCommand;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.AddPlayerResult;
@@ -29,6 +31,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,18 +46,26 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class GameSessionController {
 
+    /// Auth
+    private final CurrentUser currentUser;
+
+    /// Use cases
     private final CreateGameSessionUseCase createGameSessionUseCase;
     private final GetGameSessionUseCase getGameSessionUseCase;
     private final AnswerClueUseCase answerClueUseCase;
     private final AddPlayerUseCase addPlayerUseCase;
 
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<CreateGameSessionResponse>> createGameSession(
             @Valid @RequestBody CreateGameSessionRequest request
     ) {
+        OwnerId requesterId = currentUser.require().ownerId();
+
         CreateGameSessionCommand command = new CreateGameSessionCommand(
-                request.boardId(),
-                request.teamGame() ? GameMode.TEAM : GameMode.SOLO
+                QuizId.of(request.quizId().toString()),
+                requesterId,
+                request.mode()
         );
         GameSessionId sessionId = createGameSessionUseCase.createGameSession(command);
 

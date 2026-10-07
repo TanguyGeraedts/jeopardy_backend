@@ -23,14 +23,18 @@ public class CreateGameSessionUseCaseImpl implements CreateGameSessionUseCase {
 
     @Override
     public GameSessionId createGameSession(CreateGameSessionCommand command) {
-        List<ClueState> initialClues = loadBoardTemplatePort.loadCluesForBoard(command.boardId());
+        List<ClueState> clues = loadBoardTemplatePort.loadCluesForQuiz(command.quizId(), command.requesterId());
 
-        GameSessionId newSessionId = GameSessionId.generate();
-        GameSession session = new GameSession(newSessionId, initialClues, command.mode());
+        GameSession session = new GameSession(
+                GameSessionId.generate(),
+                command.requesterId(),
+                command.quizId(),
+                clues,
+                command.mode());
 
         saveGameSessionPort.saveGameSession(session);
         domainEventPublisher.publishAll(session.pullDomainEvents());
 
-        return newSessionId;
+        return session.getId();
     }
 }

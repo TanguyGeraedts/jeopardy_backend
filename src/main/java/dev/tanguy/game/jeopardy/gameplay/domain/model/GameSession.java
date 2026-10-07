@@ -3,7 +3,9 @@ package dev.tanguy.game.jeopardy.gameplay.domain.model;
 import dev.tanguy.game.jeopardy.common.domain.exception.DomainConflictException;
 import dev.tanguy.game.jeopardy.common.domain.model.id.ClueId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.GameSessionId;
+import dev.tanguy.game.jeopardy.common.domain.model.id.OwnerId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.PlayerId;
+import dev.tanguy.game.jeopardy.common.domain.model.id.QuizId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.TeamId;
 import dev.tanguy.game.jeopardy.common.events.DomainEvent;
 import dev.tanguy.game.jeopardy.gameplay.domain.event.ClueSelectedEvent;
@@ -19,7 +21,9 @@ import dev.tanguy.game.jeopardy.gameplay.domain.exception.player.InvalidTurnExce
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.player.PlayerNotFoundException;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.player.TeamAssignmentRequiredException;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.player.UnexpectedTeamAssignmentException;
+import dev.tanguy.game.jeopardy.gameplay.domain.exception.session.EmptyBoardException;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.session.IllegalGameStateTransitionException;
+import dev.tanguy.game.jeopardy.gameplay.domain.exception.session.LobbyCodeAlreadyAssignedException;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.team.TeamNotFoundException;
 import lombok.Getter;
 
@@ -29,22 +33,69 @@ import java.util.*;
 public class GameSession {
 
     private final GameSessionId id;
+    /** The creator/admin who started this session. Never a player. */
+    private final OwnerId ownerId;
+    /** Which quiz the board was copied from. Reference only: the clues below are a snapshot. */
+    private final QuizId quizId;
     private final GameMode mode;
     private final Map<PlayerId, Player> players = new HashMap<>();
     private final Map<TeamId, Team> teams = new HashMap<>();
-    private final Map<ClueId, ClueState> clues = new HashMap<>();
+    /** Insertion order = board order (category by category, lowest points first). */
+    private final Map<ClueId, ClueState> clues = new LinkedHashMap<>();
     private final List<DomainEvent> domainEvents = new ArrayList<>();
+
+    /** Room code issued by the lobby microservice. Null until the lobby has been created. */
+    private String lobbyCode;
 
     private GameState state = GameState.LOBBY;
     private TeamId activeTeamId;
     private PlayerId currentBuzzedPlayerId;
     private ClueId activeClueId;
 
-    public GameSession(GameSessionId id, List<ClueState> initialClues, GameMode mode) {
-        this.id = id;
-        this.mode = mode;
+    /** Starts a brand new session. Emits GameSessionCreatedEvent. */
+    public GameSession(GameSessionId id, OwnerId ownerId, QuizId quizId, List<ClueState> initialClues, GameMode mode) {
+        this(id, ownerId, quizId, mode);
+        if (initialClues == null || initialClues.isEmpty()) {
+            throw new EmptyBoardException(quizId);
+        }
         initialClues.forEach(clue -> this.clues.put(clue.getId(), clue));
         this.domainEvents.add(new GameSessionCreatedEvent(this.id));
+    }
+
+    private GameSession(GameSessionId id, OwnerId ownerId, QuizId quizId, GameMode mode) {
+        this.id = Objects.requireNonNull(id, "GameSessionId cannot be null");
+        this.ownerId = Objects.requireNonNull(ownerId, "OwnerId cannot be null");
+        this.quizId = Objects.requireNonNull(quizId, "QuizId cannot be null");
+        this.mode = Objects.requireNonNull(mode, "GameMode cannot be null");
+    }
+
+    /** Rebuilds a session from storage. No validation of transitions and no events. */
+    public static GameSession restore(
+            GameSessionId id, OwnerId ownerId, QuizId quizId, String lobbyCode, GameMode mode,
+            GameState state, TeamId activeTeamId, PlayerId currentBuzzedPlayerId, ClueId activeClueId,
+            List<ClueState> clues, List<Team> teams, List<Player> players
+    ) {
+        GameSession session = new GameSession(id, ownerId, quizId, mode);
+        session.lobbyCode = lobbyCode;
+        session.state = state;
+        session.activeTeamId = activeTeamId;
+        session.currentBuzzedPlayerId = currentBuzzedPlayerId;
+        session.activeClueId = activeClueId;
+        clues.forEach(clue -> session.clues.put(clue.getId(), clue));
+        teams.forEach(team -> session.teams.put(team.getId(), team));
+        players.forEach(player -> session.players.put(player.id(), player));
+        return session;
+    }
+
+    /** Called once, when the lobby microservice has created the room for this session. */
+    public void assignLobbyCode(String lobbyCode) {
+        if (lobbyCode == null || lobbyCode.isBlank()) {
+            throw new IllegalArgumentException("Lobby code cannot be blank");
+        }
+        if (this.lobbyCode != null) {
+            throw new LobbyCodeAlreadyAssignedException(this.id);
+        }
+        this.lobbyCode = lobbyCode.strip();
     }
 
     public Team createTeam(TeamId teamId, String teamName) {

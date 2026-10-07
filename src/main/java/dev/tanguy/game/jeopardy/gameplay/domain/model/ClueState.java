@@ -6,14 +6,16 @@ import lombok.Getter;
 @Getter
 public class ClueState {
     private final ClueId id;
+    private final String categoryName;
     private final int value;
     private final String question;
     private final String answer;
     private final boolean isDailyDouble;
     private boolean isRevealed;
 
-    public ClueState(ClueId id, int value, String question, String answer, boolean isDailyDouble) {
+    public ClueState(ClueId id, String categoryName, int value, String question, String answer, boolean isDailyDouble) {
         this.id = id;
+        this.categoryName = categoryName;
         this.value = value;
         this.question = question;
         this.answer = answer;

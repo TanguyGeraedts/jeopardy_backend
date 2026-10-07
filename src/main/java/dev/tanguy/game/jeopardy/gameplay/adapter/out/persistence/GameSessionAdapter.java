@@ -5,29 +5,35 @@ import dev.tanguy.game.jeopardy.gameplay.domain.model.GameSession;
 import dev.tanguy.game.jeopardy.gameplay.port.out.session.DeleteGameSessionPort;
 import dev.tanguy.game.jeopardy.gameplay.port.out.session.LoadGameSessionPort;
 import dev.tanguy.game.jeopardy.gameplay.port.out.session.SaveGameSessionPort;
-import org.springframework.stereotype.Repository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
-@Repository
-public class InMemoryGameSessionRepositoryAdapter implements LoadGameSessionPort, SaveGameSessionPort, DeleteGameSessionPort {
+@Component
+@RequiredArgsConstructor
+public class GameSessionAdapter implements LoadGameSessionPort, SaveGameSessionPort, DeleteGameSessionPort {
 
-    private final Map<GameSessionId, GameSession> storage = new ConcurrentHashMap<>();
+    private final GameSessionJpaRepository repository;
+    private final GameSessionMapper mapper;
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<GameSession> loadGameSessionById(GameSessionId id) {
-        return Optional.ofNullable(storage.get(id));
+        // Map inside the transaction: the child collections are lazy.
+        return repository.findById(id.value()).map(mapper::toDomain);
     }
 
     @Override
+    @Transactional
     public void saveGameSession(GameSession session) {
-        storage.put(session.getId(), session);
+        repository.save(mapper.toJpaEntity(session));
     }
 
     @Override
+    @Transactional
     public void deleteGameSessionById(GameSessionId id) {
-        storage.remove(id);
+        repository.deleteById(id.value());
     }
 }

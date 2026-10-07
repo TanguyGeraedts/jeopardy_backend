@@ -36,12 +36,17 @@ public final class GameSessionResponseMapper {
                 .toList();
 
         return new GameSessionResponse(
-                session.getId().value(), session.getState().name(), session.getMode().name(), clues, teams, players);
+                session.getId().value(),
+                session.getLobbyCode(),
+                session.getState().name(),
+                session.getMode().name(),
+                clues, teams, players);
     }
 
     private static ClueSummary toClueSummary(ClueState clue) {
         return new ClueSummary(
                 clue.getId().value(),
+                clue.getCategoryName(),
                 clue.getValue(),
                 clue.getQuestion(),
                 clue.isRevealed(),
