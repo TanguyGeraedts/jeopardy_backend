@@ -11,6 +11,7 @@ import dev.tanguy.game.jeopardy.gameplay.port.in.session.AddPlayerResult;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.AddPlayerUseCase;
 import dev.tanguy.game.jeopardy.gameplay.port.out.session.LoadGameSessionPort;
 import dev.tanguy.game.jeopardy.gameplay.port.out.session.SaveGameSessionPort;
+import dev.tanguy.game.jeopardy.gameplay.port.out.session.GameSessionUpdatesPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +24,7 @@ public class AddPlayerUseCaseImpl implements AddPlayerUseCase {
     private final LoadGameSessionPort loadGameSessionPort;
     private final SaveGameSessionPort saveGameSessionPort;
     private final DomainEventPublisher domainEventPublisher;
+    private final GameSessionUpdatesPort gameSessionUpdatesPort;
 
     @Override
     public AddPlayerResult addPlayer(AddPlayerCommand command) {
@@ -49,6 +51,7 @@ public class AddPlayerUseCaseImpl implements AddPlayerUseCase {
 
         saveGameSessionPort.saveGameSession(session);
         domainEventPublisher.publishAll(session.pullDomainEvents());
+        gameSessionUpdatesPort.sessionChanged(session);
 
         TeamId assignedTeamId = session.getPlayers().stream()
                 .filter(p -> p.id().equals(command.playerId()))

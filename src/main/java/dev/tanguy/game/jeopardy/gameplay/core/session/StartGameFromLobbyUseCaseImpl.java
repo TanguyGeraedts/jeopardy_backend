@@ -15,6 +15,7 @@ import dev.tanguy.game.jeopardy.gameplay.port.out.lobby.LobbyHandoff;
 import dev.tanguy.game.jeopardy.gameplay.port.out.lobby.LobbyPort;
 import dev.tanguy.game.jeopardy.gameplay.port.out.session.LoadGameSessionPort;
 import dev.tanguy.game.jeopardy.gameplay.port.out.session.SaveGameSessionPort;
+import dev.tanguy.game.jeopardy.gameplay.port.out.session.GameSessionUpdatesPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +30,7 @@ public class StartGameFromLobbyUseCaseImpl implements StartGameFromLobbyUseCase 
     private final SaveGameSessionPort saveGameSessionPort;
     private final LobbyPort lobbyPort;
     private final DomainEventPublisher domainEventPublisher;
+    private final GameSessionUpdatesPort gameSessionUpdatesPort;
 
     @Override
     public GameSession startFromHandoff(StartGameFromLobbyCommand command) {
@@ -72,6 +74,7 @@ public class StartGameFromLobbyUseCaseImpl implements StartGameFromLobbyUseCase 
 
         saveGameSessionPort.saveGameSession(session);
         domainEventPublisher.publishAll(session.pullDomainEvents());
+        gameSessionUpdatesPort.sessionChanged(session);
 
         return session;
     }

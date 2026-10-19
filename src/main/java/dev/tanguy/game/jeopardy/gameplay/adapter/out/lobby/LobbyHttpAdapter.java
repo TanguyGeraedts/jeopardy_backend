@@ -2,6 +2,7 @@ package dev.tanguy.game.jeopardy.gameplay.adapter.out.lobby;
 
 import dev.tanguy.game.jeopardy.common.domain.exception.ExternalServiceException;
 import dev.tanguy.game.jeopardy.gameplay.port.out.lobby.LobbyHandoff;
+import dev.tanguy.game.jeopardy.gameplay.port.out.lobby.LobbyPlayerIdentity;
 import dev.tanguy.game.jeopardy.gameplay.port.out.lobby.LobbyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,7 @@ public class LobbyHttpAdapter implements LobbyPort {
     private final RestClient lobbyRestClient;
     private final LobbyProperties properties;
     private final LobbyHandoffVerifier handoffVerifier;
+    private final LobbyPlayerTokenVerifier playerTokenVerifier;
 
     // ---- Mirrors the lobby's LobbyConfig / GameInfo records (field names must match its JSON) ----
     public record GameInfoBody(
@@ -83,5 +85,10 @@ public class LobbyHttpAdapter implements LobbyPort {
     @Override
     public LobbyHandoff verifyHandoff(String handoffToken) {
         return handoffVerifier.verify(handoffToken);
+    }
+
+    @Override
+    public LobbyPlayerIdentity verifyPlayerToken(String playerToken) {
+        return playerTokenVerifier.verify(playerToken);
     }
 }

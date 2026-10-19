@@ -36,6 +36,10 @@ public class SecurityConfig {
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         // The lobby's signed handoff token is the credential; the lobby host is a player, not a logged-in user.
                         .requestMatchers(HttpMethod.POST, ApiPaths.Gameplay.BASE + "/*/handoff").permitAll()
+                        // Players have no login: the lobby's signed player token (X-Player-Token) is the credential.
+                        .requestMatchers(HttpMethod.POST, ApiPaths.Gameplay.BASE + "/*/buzz").permitAll()
+                        // Live stream for board and phones. EventSource can't send headers; the stream has no answers.
+                        .requestMatchers(HttpMethod.GET, ApiPaths.Gameplay.BASE + "/*/events").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))

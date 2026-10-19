@@ -17,7 +17,6 @@ import dev.tanguy.game.jeopardy.gameplay.domain.event.PlayerJoinedEvent;
 import dev.tanguy.game.jeopardy.gameplay.domain.event.TeamCreatedEvent;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.clue.ClueAlreadyRevealedException;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.clue.ClueNotFoundException;
-import dev.tanguy.game.jeopardy.gameplay.domain.exception.player.InvalidTurnException;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.player.PlayerNotFoundException;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.player.TeamAssignmentRequiredException;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.player.UnexpectedTeamAssignmentException;
@@ -49,8 +48,11 @@ public class GameSession {
 
     private GameState state = GameState.LOBBY;
     private TeamId activeTeamId;
+    /** The player answering right now (head of the buzz queue). Null unless ANSWER_EVALUATION. */
     private PlayerId currentBuzzedPlayerId;
     private ClueId activeClueId;
+    /** Who buzzed on the open clue, in arrival order: at most one player per team. Locked-out teams are removed. */
+    private final List<PlayerId> buzzQueue = new ArrayList<>();
 
     /** Starts a brand new session. Emits GameSessionCreatedEvent. */
     public GameSession(GameSessionId id, OwnerId ownerId, QuizId quizId, List<ClueState> initialClues, GameMode mode) {
@@ -73,6 +75,7 @@ public class GameSession {
     public static GameSession restore(
             GameSessionId id, OwnerId ownerId, QuizId quizId, String lobbyCode, GameMode mode,
             GameState state, TeamId activeTeamId, PlayerId currentBuzzedPlayerId, ClueId activeClueId,
+            List<PlayerId> buzzQueue,
             List<ClueState> clues, List<Team> teams, List<Player> players
     ) {
         GameSession session = new GameSession(id, ownerId, quizId, mode);
@@ -81,6 +84,7 @@ public class GameSession {
         session.activeTeamId = activeTeamId;
         session.currentBuzzedPlayerId = currentBuzzedPlayerId;
         session.activeClueId = activeClueId;
+        session.buzzQueue.addAll(buzzQueue);
         clues.forEach(clue -> session.clues.put(clue.getId(), clue));
         teams.forEach(team -> session.teams.put(team.getId(), team));
         players.forEach(player -> session.players.put(player.id(), player));
@@ -168,19 +172,10 @@ public class GameSession {
         this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
     }
 
-    public void selectClue(PlayerId selector, ClueId clueId) {
+    /** The host opens a clue. Buzzers stay closed while it is being read (CLUE_READING). */
+    public void selectClue(ClueId clueId) {
         if (state != GameState.BOARD_SELECTION) {
             throw new IllegalGameStateTransitionException(state, "selectClue");
-        }
-
-        Player player = players.get(selector);
-        if (player == null) {
-            throw new PlayerNotFoundException(selector);
-        }
-
-        TeamId playerTeamId = player.getTeamId().orElseThrow(() -> new TeamNotFoundException(null));
-        if (!playerTeamId.equals(activeTeamId)) {
-            throw new InvalidTurnException(selector);
         }
 
         ClueState clue = clues.get(clueId);
@@ -193,12 +188,16 @@ public class GameSession {
 
         clue.markAsRevealed();
         this.activeClueId = clueId;
+        this.currentBuzzedPlayerId = null;
+        this.buzzQueue.clear();
+        teams.values().forEach(team -> team.setLockedOut(false));
         this.state = GameState.CLUE_READING;
 
-        this.domainEvents.add(new ClueSelectedEvent(this.id, selector, clueId));
+        this.domainEvents.add(new ClueSelectedEvent(this.id, clueId));
         this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
     }
 
+    /** The host finished reading: buzzes count from now on. */
     public void openBuzzers() {
         if (state != GameState.CLUE_READING) {
             throw new IllegalGameStateTransitionException(state, "openBuzzers");
@@ -207,24 +206,50 @@ public class GameSession {
         this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
     }
 
+    /**
+     * Records a buzz in arrival order. Buzzes keep queueing while someone answers, so the next team is up
+     * right away after a wrong answer. Returns false (no error) when the buzz doesn't count: buzzers closed,
+     * too early, team locked out, or the team already buzzed. Players mash the button; that's fine.
+     */
     public boolean registerBuzz(PlayerId playerId) {
-        if (state != GameState.BUZZER_OPEN) {
+        Player player = players.get(playerId);
+        if (player == null) {
+            throw new PlayerNotFoundException(playerId);
+        }
+        if (state != GameState.BUZZER_OPEN && state != GameState.ANSWER_EVALUATION) {
             return false;
         }
 
-        if (!players.containsKey(playerId)) {
-            throw new PlayerNotFoundException(playerId);
+        TeamId teamId = player.getTeamId().orElseThrow(() -> new TeamNotFoundException(null));
+        if (!canBuzz(teamId)) {
+            return false;
         }
 
-        this.currentBuzzedPlayerId = playerId;
-        this.state = GameState.ANSWER_EVALUATION;
-
+        buzzQueue.add(playerId);
         this.domainEvents.add(new BuzzerPressedEvent(this.id, playerId));
-        this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
 
+        if (state == GameState.BUZZER_OPEN) {
+            this.currentBuzzedPlayerId = playerId;
+            this.state = GameState.ANSWER_EVALUATION;
+            this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
+        }
         return true;
     }
 
+    /** Whether a buzz from this team would count now (ignoring the game state). */
+    public boolean canBuzz(TeamId teamId) {
+        Team team = teams.get(teamId);
+        if (team == null || team.isLockedOut()) {
+            return false;
+        }
+        return buzzQueue.stream().noneMatch(queued -> teamId.equals(teamOf(queued)));
+    }
+
+    /**
+     * The host judges the answering player. Correct: +points, that team picks next, back to the board.
+     * Wrong: -points, the team is locked out for this clue and the next team in the queue is up
+     * (or buzzers stay open if nobody else has buzzed yet).
+     */
     public void evaluateAnswer(boolean isCorrect) {
         if (state != GameState.ANSWER_EVALUATION) {
             throw new IllegalGameStateTransitionException(state, "evaluateAnswer");
@@ -235,13 +260,9 @@ public class GameSession {
             throw new ClueNotFoundException(activeClueId);
         }
 
-        Player player = players.get(currentBuzzedPlayerId);
-        if (player == null) {
-            throw new PlayerNotFoundException(currentBuzzedPlayerId);
-        }
-
-        TeamId teamId = player.getTeamId().orElseThrow(() -> new TeamNotFoundException(null));
-        Team team = teams.get(teamId);
+        PlayerId answeringPlayerId = currentBuzzedPlayerId;
+        TeamId teamId = teamOf(answeringPlayerId);
+        Team team = teamId == null ? null : teams.get(teamId);
         if (team == null) {
             throw new TeamNotFoundException(teamId);
         }
@@ -252,17 +273,57 @@ public class GameSession {
             resetToBoardSelection();
         } else {
             team.subtractScore(clue.getValue());
-            this.currentBuzzedPlayerId = null;
-            this.state = GameState.BUZZER_OPEN;
+            team.setLockedOut(true);
+            buzzQueue.remove(answeringPlayerId);
+            this.currentBuzzedPlayerId = buzzQueue.isEmpty() ? null : buzzQueue.getFirst();
+            this.state = currentBuzzedPlayerId == null ? GameState.BUZZER_OPEN : GameState.ANSWER_EVALUATION;
         }
 
-        this.domainEvents.add(new AnswerEvaluatedEvent(this.id, currentBuzzedPlayerId, teamId, isCorrect, clue.getValue()));
+        this.domainEvents.add(new AnswerEvaluatedEvent(this.id, answeringPlayerId, teamId, isCorrect, clue.getValue()));
         this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
+    }
+
+    /** The host ends the open clue without (more) points, e.g. nobody knows it or time is up. */
+    public void closeClue() {
+        if (state != GameState.CLUE_READING && state != GameState.BUZZER_OPEN && state != GameState.ANSWER_EVALUATION) {
+            throw new IllegalGameStateTransitionException(state, "closeClue");
+        }
+        resetToBoardSelection();
+        this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
+    }
+
+    /** Host correction, any time after the start. */
+    public void adjustScore(TeamId teamId, int delta) {
+        requireTeam(teamId).addScore(delta);
+    }
+
+    /** Host correction, any time after the start. */
+    public void setScore(TeamId teamId, int score) {
+        requireTeam(teamId).setScore(score);
+    }
+
+    public Optional<Player> findPlayer(PlayerId playerId) {
+        return Optional.ofNullable(players.get(playerId));
+    }
+
+    private Team requireTeam(TeamId teamId) {
+        Team team = teams.get(teamId);
+        if (team == null) {
+            throw new TeamNotFoundException(teamId);
+        }
+        return team;
+    }
+
+    private TeamId teamOf(PlayerId playerId) {
+        Player player = playerId == null ? null : players.get(playerId);
+        return player == null ? null : player.teamId();
     }
 
     private void resetToBoardSelection() {
         this.activeClueId = null;
         this.currentBuzzedPlayerId = null;
+        this.buzzQueue.clear();
+        teams.values().forEach(team -> team.setLockedOut(false));
 
         boolean allRevealed = clues.values().stream().allMatch(ClueState::isRevealed);
         this.state = allRevealed ? GameState.GAME_OVER : GameState.BOARD_SELECTION;
@@ -274,6 +335,7 @@ public class GameSession {
         return copy;
     }
 
+    public List<PlayerId> getBuzzQueue() { return Collections.unmodifiableList(buzzQueue); }
     public Collection<Player> getPlayers() { return Collections.unmodifiableCollection(players.values()); }
     public Collection<Team> getTeams() { return Collections.unmodifiableCollection(teams.values()); }
 }

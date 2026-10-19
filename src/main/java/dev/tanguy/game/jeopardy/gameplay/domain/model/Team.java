@@ -16,6 +16,8 @@ public class Team {
     private final String colour;
     private final Set<PlayerId> memberIds = new HashSet<>();
     private int score;
+    /** Answered the open clue wrongly: can't buzz again until the next clue. */
+    private boolean lockedOut;
 
     public Team(TeamId id, String name) {
         this(id, name, null, null);
@@ -39,6 +41,14 @@ public class Team {
 
     public void subtractScore(int points) {
         this.score -= points;
+    }
+
+    public void setScore(int score) {
+        this.score = score;
+    }
+
+    public void setLockedOut(boolean lockedOut) {
+        this.lockedOut = lockedOut;
     }
 
     public Set<PlayerId> getMemberIds() {

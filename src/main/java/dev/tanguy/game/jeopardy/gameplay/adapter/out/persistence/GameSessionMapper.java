@@ -12,6 +12,7 @@ import dev.tanguy.game.jeopardy.gameplay.domain.model.Player;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.Team;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,6 +33,7 @@ public class GameSessionMapper {
                 .activeTeamId(session.getActiveTeamId() == null ? null : session.getActiveTeamId().value())
                 .currentBuzzedPlayerId(session.getCurrentBuzzedPlayerId() == null ? null : session.getCurrentBuzzedPlayerId().value())
                 .activeClueId(session.getActiveClueId() == null ? null : UUID.fromString(session.getActiveClueId().value()))
+                .buzzQueue(new ArrayList<>(session.getBuzzQueue().stream().map(PlayerId::value).toList()))
                 .build();
 
         int position = 0;
@@ -55,6 +57,7 @@ public class GameSessionMapper {
                     .externalTeamId(team.getExternalTeamId())
                     .colour(team.getColour())
                     .score(team.getScore())
+                    .lockedOut(team.isLockedOut())
                     .build());
         }
 
@@ -87,6 +90,7 @@ public class GameSessionMapper {
                 entity.getActiveTeamId() == null ? null : new TeamId(entity.getActiveTeamId()),
                 entity.getCurrentBuzzedPlayerId() == null ? null : new PlayerId(entity.getCurrentBuzzedPlayerId()),
                 entity.getActiveClueId() == null ? null : new ClueId(entity.getActiveClueId().toString()),
+                entity.getBuzzQueue().stream().map(PlayerId::new).toList(),
                 clues,
                 teams,
                 players);
@@ -116,6 +120,7 @@ public class GameSessionMapper {
     private Team toTeam(TeamJpaEntity entity, List<PlayerJpaEntity> allPlayers) {
         Team team = new Team(new TeamId(entity.getId()), entity.getName(), entity.getExternalTeamId(), entity.getColour());
         team.addScore(entity.getScore());
+        team.setLockedOut(entity.isLockedOut());
         // Team membership is derived from the players table.
         allPlayers.stream()
                 .filter(player -> entity.getId().equals(player.getTeamId()))

@@ -1,22 +1,39 @@
 package dev.tanguy.game.jeopardy.gameplay.adapter.in.web.mapper;
 
+import dev.tanguy.game.jeopardy.common.domain.model.id.PlayerId;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.GameSessionResponse;
+import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.GameSessionResponse.BuzzSummary;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.GameSessionResponse.ClueSummary;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.GameSessionResponse.PlayerSummary;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.GameSessionResponse.TeamSummary;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.ClueState;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.GameSession;
+import dev.tanguy.game.jeopardy.gameplay.domain.model.GameState;
+import dev.tanguy.game.jeopardy.gameplay.domain.model.Player;
 
 import java.util.List;
+import java.util.UUID;
 
 public final class GameSessionResponseMapper {
 
     private GameSessionResponseMapper() {}
 
+    /** For the host's screens: everything, including answers of revealed clues. */
     public static GameSessionResponse toResponse(GameSession session) {
+        return map(session, true);
+    }
+
+    /** For anyone (live stream, phones): no answers, and only the open clue's question. */
+    public static GameSessionResponse toPublicResponse(GameSession session) {
+        return map(session, false);
+    }
+
+    private static GameSessionResponse map(GameSession session, boolean forHost) {
         List<ClueSummary> clues = session.getClues().values().stream()
-                .map(GameSessionResponseMapper::toClueSummary)
+                .map(clue -> forHost ? toClueSummary(clue) : toPublicClueSummary(clue, session))
                 .toList();
+
+        boolean buzzing = session.getState() == GameState.BUZZER_OPEN || session.getState() == GameState.ANSWER_EVALUATION;
 
         List<TeamSummary> teams = session.getTeams().stream()
                 .map(t -> new TeamSummary(
@@ -25,7 +42,9 @@ public final class GameSessionResponseMapper {
                         t.getExternalTeamId(),
                         t.getColour(),
                         t.getScore(),
-                        t.getMemberIds().stream().map(id -> id.value().toString()).toList()))
+                        t.getMemberIds().stream().map(id -> id.value().toString()).toList(),
+                        t.isLockedOut(),
+                        buzzing && session.canBuzz(t.getId())))
                 .toList();
 
         List<PlayerSummary> players = session.getPlayers().stream()
@@ -35,12 +54,27 @@ public final class GameSessionResponseMapper {
                         p.teamId() != null ? p.teamId().value().toString() : null))
                 .toList();
 
+        List<BuzzSummary> buzzes = session.getBuzzQueue().stream()
+                .map(playerId -> new BuzzSummary(
+                        playerId.value().toString(),
+                        session.findPlayer(playerId).map(Player::teamId).map(id -> id.value().toString()).orElse(null)))
+                .toList();
+
         return new GameSessionResponse(
                 session.getId().value(),
                 session.getLobbyCode(),
                 session.getState().name(),
                 session.getMode().name(),
+                session.getActiveClueId() != null ? session.getActiveClueId().value() : null,
+                session.getActiveTeamId() != null ? session.getActiveTeamId().value().toString() : null,
+                idOf(session.getCurrentBuzzedPlayerId()),
+                buzzes,
                 clues, teams, players);
+    }
+
+    private static String idOf(PlayerId playerId) {
+        UUID value = playerId == null ? null : playerId.value();
+        return value == null ? null : value.toString();
     }
 
     private static ClueSummary toClueSummary(ClueState clue) {
@@ -52,6 +86,19 @@ public final class GameSessionResponseMapper {
                 clue.isRevealed(),
                 clue.isDailyDouble(),
                 clue.isRevealed() ? clue.getAnswer() : null
+        );
+    }
+
+    private static ClueSummary toPublicClueSummary(ClueState clue, GameSession session) {
+        boolean open = clue.getId().equals(session.getActiveClueId());
+        return new ClueSummary(
+                clue.getId().value(),
+                clue.getCategoryName(),
+                clue.getValue(),
+                open ? clue.getQuestion() : null,
+                clue.isRevealed(),
+                clue.isDailyDouble(),
+                null
         );
     }
 }

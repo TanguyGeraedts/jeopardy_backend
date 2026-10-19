@@ -14,6 +14,9 @@ public interface LobbyPort {
     /** Checks the lobby's signed handoff token and returns its content. Throws InvalidHandoffException if bad. */
     LobbyHandoff verifyHandoff(String handoffToken);
 
+    /** Checks a player's signed game token (one per player, from the lobby). Throws InvalidPlayerTokenException if bad. */
+    LobbyPlayerIdentity verifyPlayerToken(String playerToken);
+
     /** maxPlayers = lobby seats (the quiz master does not join the lobby). teamCount is null for SOLO. */
     record CreateLobbyRequest(GameSessionId gameSessionId, GameMode mode, int maxPlayers, Integer teamCount) {}
 

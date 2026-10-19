@@ -33,4 +33,7 @@ public class TeamJpaEntity {
 
     @Column(name = "score", nullable = false)
     private int score;
+
+    @Column(name = "locked_out", nullable = false)
+    private boolean lockedOut;
 }

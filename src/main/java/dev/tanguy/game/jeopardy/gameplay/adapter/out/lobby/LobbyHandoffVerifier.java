@@ -83,7 +83,7 @@ public class LobbyHandoffVerifier {
                         .toList());
     }
 
-    private static RSAPublicKey readPublicKey(LobbyProperties properties) throws Exception {
+    static RSAPublicKey readPublicKey(LobbyProperties properties) throws Exception {
         String pem = properties.publicKeyLocation().getContentAsString(StandardCharsets.UTF_8)
                 .replace("-----BEGIN PUBLIC KEY-----", "")
                 .replace("-----END PUBLIC KEY-----", "")

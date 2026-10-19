@@ -18,6 +18,8 @@ public record LobbyProperties(
         Resource publicKeyLocation,
         @DefaultValue("lobby-service") String issuer,
         @DefaultValue("game-server") String handoffAudience,
+        /** Audience of the per-player game tokens the lobby hands each player (used to buzz). */
+        @DefaultValue("game-player") String playerAudience,
         @DefaultValue("Jeopardy") String gameName,
         @DefaultValue("#0F172A") String backgroundColor,
         /** Players needed in the lobby before its host (the first player to join) can start the game. */

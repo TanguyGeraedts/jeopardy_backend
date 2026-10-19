@@ -11,6 +11,7 @@ import dev.tanguy.game.jeopardy.gameplay.port.in.session.AnswerClueResult;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.AnswerClueUseCase;
 import dev.tanguy.game.jeopardy.gameplay.port.out.session.LoadGameSessionPort;
 import dev.tanguy.game.jeopardy.gameplay.port.out.session.SaveGameSessionPort;
+import dev.tanguy.game.jeopardy.gameplay.port.out.session.GameSessionUpdatesPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +22,7 @@ public class AnswerClueUseCaseImpl implements AnswerClueUseCase {
     private final LoadGameSessionPort loadGameSessionPort;
     private final SaveGameSessionPort saveGameSessionPort;
     private final DomainEventPublisher domainEventPublisher;
+    private final GameSessionUpdatesPort gameSessionUpdatesPort;
 
     @Override
     public AnswerClueResult answerClue(AnswerClueCommand command) {
@@ -44,6 +46,7 @@ public class AnswerClueUseCaseImpl implements AnswerClueUseCase {
 
         saveGameSessionPort.saveGameSession(session);
         domainEventPublisher.publishAll(session.pullDomainEvents());
+        gameSessionUpdatesPort.sessionChanged(session);
 
         return new AnswerClueResult(isCorrect, scoreDelta, clue.getAnswer());
     }
