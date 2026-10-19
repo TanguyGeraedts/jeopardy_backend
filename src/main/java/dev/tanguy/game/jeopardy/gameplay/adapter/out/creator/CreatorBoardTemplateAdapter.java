@@ -5,6 +5,7 @@ import dev.tanguy.game.jeopardy.common.domain.model.id.OwnerId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.QuizId;
 import dev.tanguy.game.jeopardy.creator.api.QuizSnapshot;
 import dev.tanguy.game.jeopardy.creator.api.QuizSnapshotQuery;
+import dev.tanguy.game.jeopardy.gameplay.domain.model.ClueMediaType;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.ClueState;
 import dev.tanguy.game.jeopardy.gameplay.port.out.board.LoadBoardTemplatePort;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +31,9 @@ public class CreatorBoardTemplateAdapter implements LoadBoardTemplatePort {
                                 q.points(),
                                 q.text(),
                                 q.answer(),
-                                q.dailyDouble())))
+                                q.dailyDouble(),
+                                q.mediaType() == null ? null : ClueMediaType.valueOf(q.mediaType()),
+                                q.mediaUrl())))
                 .toList();
     }
 }

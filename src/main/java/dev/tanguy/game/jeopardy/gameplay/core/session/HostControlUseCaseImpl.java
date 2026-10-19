@@ -4,6 +4,7 @@ import dev.tanguy.game.jeopardy.common.domain.model.id.ClueId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.GameSessionId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.OwnerId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.TeamId;
+import dev.tanguy.game.jeopardy.gameplay.domain.model.BuzzerSound;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.GameSession;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.HostControlUseCase;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,11 @@ public class HostControlUseCaseImpl implements HostControlUseCase {
             if (delta != null) session.adjustScore(teamId, delta);
             else session.setScore(teamId, score);
         });
+    }
+
+    @Override
+    public GameSession setTeamBuzzerSound(GameSessionId sessionId, OwnerId requesterId, TeamId teamId, BuzzerSound sound) {
+        return change(sessionId, requesterId, session -> session.setTeamBuzzerSound(teamId, sound));
     }
 
     private GameSession change(GameSessionId sessionId, OwnerId requesterId, Consumer<GameSession> change) {

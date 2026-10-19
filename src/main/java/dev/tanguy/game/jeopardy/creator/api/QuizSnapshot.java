@@ -10,5 +10,7 @@ public record QuizSnapshot(QuizId id, String name, List<CategorySnapshot> catego
 
     public record CategorySnapshot(CategoryId id, String name, List<QuestionSnapshot> questions) {}
 
-    public record QuestionSnapshot(QuestionId id, int points, String text, String answer, boolean dailyDouble) {}
+    /** mediaType is "IMAGE" or "VIDEO" with a mediaUrl, or both null for a text-only question. */
+    public record QuestionSnapshot(
+            QuestionId id, int points, String text, String answer, boolean dailyDouble, String mediaType, String mediaUrl) {}
 }

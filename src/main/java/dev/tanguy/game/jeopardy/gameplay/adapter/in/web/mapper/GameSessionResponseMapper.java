@@ -44,6 +44,7 @@ public final class GameSessionResponseMapper {
                         t.getScore(),
                         t.getMemberIds().stream().map(id -> id.value().toString()).toList(),
                         t.isLockedOut(),
+                        t.getBuzzerSound() != null ? t.getBuzzerSound().name() : null,
                         buzzing && session.canBuzz(t.getId())))
                 .toList();
 
@@ -85,7 +86,9 @@ public final class GameSessionResponseMapper {
                 clue.getQuestion(),
                 clue.isRevealed(),
                 clue.isDailyDouble(),
-                clue.isRevealed() ? clue.getAnswer() : null
+                clue.isRevealed() ? clue.getAnswer() : null,
+                clue.getMediaType() != null ? clue.getMediaType().name() : null,
+                clue.getMediaUrl()
         );
     }
 
@@ -98,7 +101,9 @@ public final class GameSessionResponseMapper {
                 open ? clue.getQuestion() : null,
                 clue.isRevealed(),
                 clue.isDailyDouble(),
-                null
+                null,
+                open && clue.getMediaType() != null ? clue.getMediaType().name() : null,
+                open ? clue.getMediaUrl() : null
         );
     }
 }

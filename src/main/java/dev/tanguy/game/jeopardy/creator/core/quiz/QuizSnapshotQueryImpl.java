@@ -7,6 +7,7 @@ import dev.tanguy.game.jeopardy.creator.api.QuizSnapshot.CategorySnapshot;
 import dev.tanguy.game.jeopardy.creator.api.QuizSnapshot.QuestionSnapshot;
 import dev.tanguy.game.jeopardy.creator.api.QuizSnapshotQuery;
 import dev.tanguy.game.jeopardy.creator.core.OwnedQuizFinder;
+import dev.tanguy.game.jeopardy.creator.domain.model.AnswerType;
 import dev.tanguy.game.jeopardy.creator.domain.model.Quiz;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -34,7 +35,9 @@ public class QuizSnapshotQueryImpl implements QuizSnapshotQuery {
                                                 q.getPoints(),
                                                 q.getQuestionText(),
                                                 q.getAnswerText(),
-                                                q.isDailyDouble()))
+                                                q.isDailyDouble(),
+                                                q.getAnswerType() == AnswerType.TEXT ? null : q.getAnswerType().name(),
+                                                q.getMediaUrl()))
                                         .toList()))
                         .toList());
     }

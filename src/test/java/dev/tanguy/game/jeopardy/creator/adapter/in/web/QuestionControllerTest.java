@@ -206,7 +206,7 @@ class QuestionControllerTest {
                         .header("Authorization", "Bearer " + tokenFor(ALICE))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"points":100,"questionText":"Q?","answerText":"A","answerType":"AUDIO"}"""))
+                                {"points":100,"questionText":"Q?","answerText":"A","answerType":"HOLOGRAM"}"""))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(addQuestionUseCase);

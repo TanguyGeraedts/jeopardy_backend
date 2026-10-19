@@ -1,4 +1,3 @@
-# resources/application.yaml  (changed: lobby public key)
 spring:
   application:
     name: jeopardy
@@ -8,6 +7,7 @@ spring:
     password: jeopardy_password
     driver-class-name: org.postgresql.Driver
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
     show-sql: true

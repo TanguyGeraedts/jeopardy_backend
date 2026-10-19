@@ -18,6 +18,8 @@ public class Team {
     private int score;
     /** Answered the open clue wrongly: can't buzz again until the next clue. */
     private boolean lockedOut;
+    /** Picked by the host; played on the board when this team buzzes. Null = automatic (by team position). */
+    private BuzzerSound buzzerSound;
 
     public Team(TeamId id, String name) {
         this(id, name, null, null);
@@ -49,6 +51,10 @@ public class Team {
 
     public void setLockedOut(boolean lockedOut) {
         this.lockedOut = lockedOut;
+    }
+
+    public void setBuzzerSound(BuzzerSound buzzerSound) {
+        this.buzzerSound = buzzerSound;
     }
 
     public Set<PlayerId> getMemberIds() {

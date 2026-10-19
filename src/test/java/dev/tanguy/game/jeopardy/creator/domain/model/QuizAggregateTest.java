@@ -7,6 +7,7 @@ import dev.tanguy.game.jeopardy.common.domain.model.id.QuizId;
 import dev.tanguy.game.jeopardy.creator.domain.event.category.DuplicateQuestionPointsException;
 import dev.tanguy.game.jeopardy.creator.domain.event.category.QuestionNotFoundException;
 import dev.tanguy.game.jeopardy.creator.domain.event.question.MissingMediaUrlException;
+import dev.tanguy.game.jeopardy.creator.domain.event.question.UnsupportedAudioUrlException;
 import dev.tanguy.game.jeopardy.creator.domain.event.quiz.CategoryNotFoundException;
 import dev.tanguy.game.jeopardy.creator.domain.event.quiz.DuplicateCategoryNameException;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,6 +104,22 @@ class QuizAggregateTest {
         assertThatThrownBy(() ->
                 history.updateQuestion(q.getId(), 200, "Q?", "A", AnswerType.IMAGE, " ", false))
                 .isInstanceOf(MissingMediaUrlException.class);
+    }
+
+    @Test
+    void audio_needsAUrl_andCannotBeYoutube() {
+        Question q = question(200);
+        history.addQuestion(q);
+
+        assertThatThrownBy(() -> history.updateQuestion(q.getId(), 200, "Q?", "A", AnswerType.AUDIO, " ", false))
+                .isInstanceOf(MissingMediaUrlException.class);
+        assertThatThrownBy(() -> history.updateQuestion(q.getId(), 200, "Q?", "A", AnswerType.AUDIO, "https://youtu.be/dQw4w9WgXcQ", false))
+                .isInstanceOf(UnsupportedAudioUrlException.class);
+        assertThatThrownBy(() -> history.updateQuestion(q.getId(), 200, "Q?", "A", AnswerType.AUDIO, "https://www.youtube.com/watch?v=dQw4w9WgXcQ", false))
+                .isInstanceOf(UnsupportedAudioUrlException.class);
+
+        history.updateQuestion(q.getId(), 200, "Q?", "A", AnswerType.AUDIO, "https://example.com/intro.mp3", false);
+        assertThat(history.getQuestion(q.getId()).getAnswerType()).isEqualTo(AnswerType.AUDIO);
     }
 
     @Test

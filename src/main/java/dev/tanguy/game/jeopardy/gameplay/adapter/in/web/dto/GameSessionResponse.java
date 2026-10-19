@@ -25,13 +25,18 @@ public record GameSessionResponse(
         List<PlayerSummary> players
 ) {
     public record ClueSummary(
-            String id, String category, int value, String question, boolean revealed, boolean dailyDouble, String answer
+            String id, String category, int value, String question, boolean revealed, boolean dailyDouble, String answer,
+            /** "IMAGE" or "VIDEO" (a YouTube link or a direct video file), shown with the question. Null = text only. */
+            String mediaType,
+            String mediaUrl
     ) {}
 
     public record TeamSummary(
             String id, String name, String externalTeamId, String colour, int score, List<String> memberIds,
             /** Answered the open clue wrongly. */
             boolean lockedOut,
+            /** Played on the board when the team buzzes. Null = automatic (by team position). */
+            String buzzerSound,
             /** A buzz from this team would count right now. */
             boolean canBuzz
     ) {}

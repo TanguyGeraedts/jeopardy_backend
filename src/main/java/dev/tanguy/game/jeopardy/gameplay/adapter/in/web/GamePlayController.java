@@ -8,6 +8,7 @@ import dev.tanguy.game.jeopardy.common.infrastructure.security.CurrentUser;
 import dev.tanguy.game.jeopardy.common.web.ApiPaths;
 import dev.tanguy.game.jeopardy.common.web.ApiResponse;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.BuzzResponse;
+import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.BuzzerSoundRequest;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.ChangeScoreRequest;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.GameSessionResponse;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.JudgeAnswerRequest;
@@ -28,6 +29,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -102,6 +104,12 @@ public class GamePlayController {
     public ResponseEntity<ApiResponse<GameSessionResponse>> changeScore(
             @PathVariable UUID id, @PathVariable UUID teamId, @RequestBody ChangeScoreRequest request) {
         return ok(hostControlUseCase.changeScore(sessionId(id), owner(), new TeamId(teamId), request.delta(), request.score()));
+    }
+
+    @PutMapping(ApiPaths.Gameplay.TEAM_BUZZER_SOUND)
+    public ResponseEntity<ApiResponse<GameSessionResponse>> setTeamBuzzerSound(
+            @PathVariable UUID id, @PathVariable UUID teamId, @RequestBody BuzzerSoundRequest request) {
+        return ok(hostControlUseCase.setTeamBuzzerSound(sessionId(id), owner(), new TeamId(teamId), request.sound()));
     }
 
     private OwnerId owner() {

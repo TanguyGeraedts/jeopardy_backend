@@ -1,5 +1,6 @@
 package dev.tanguy.game.jeopardy.gameplay.adapter.out.persistence;
 
+import dev.tanguy.game.jeopardy.gameplay.domain.model.ClueMediaType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -40,6 +41,14 @@ public class ClueJpaEntity {
 
     @Column(name = "is_daily_double", nullable = false)
     private boolean dailyDouble;
+
+    /** IMAGE or VIDEO, shown with the question. Null for a text-only clue. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "media_type", length = 10)
+    private ClueMediaType mediaType;
+
+    @Column(name = "media_url", length = 2048)
+    private String mediaUrl;
 
     @Column(name = "is_revealed", nullable = false)
     private boolean revealed;

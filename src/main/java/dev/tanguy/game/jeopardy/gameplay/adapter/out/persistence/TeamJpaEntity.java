@@ -1,5 +1,6 @@
 package dev.tanguy.game.jeopardy.gameplay.adapter.out.persistence;
 
+import dev.tanguy.game.jeopardy.gameplay.domain.model.BuzzerSound;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -36,4 +37,9 @@ public class TeamJpaEntity {
 
     @Column(name = "locked_out", nullable = false)
     private boolean lockedOut;
+
+    /** Null = automatic (by team position). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "buzzer_sound", length = 20)
+    private BuzzerSound buzzerSound;
 }

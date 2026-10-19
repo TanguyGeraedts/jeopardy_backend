@@ -6,9 +6,11 @@ import dev.tanguy.game.jeopardy.creator.domain.event.question.InvalidAnswerTextE
 import dev.tanguy.game.jeopardy.creator.domain.event.question.InvalidPointsException;
 import dev.tanguy.game.jeopardy.creator.domain.event.question.InvalidQuestionTextException;
 import dev.tanguy.game.jeopardy.creator.domain.event.question.MissingMediaUrlException;
+import dev.tanguy.game.jeopardy.creator.domain.event.question.UnsupportedAudioUrlException;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.net.URI;
 import java.util.Objects;
 
 @Getter
@@ -83,11 +85,24 @@ public class Question {
 
     public void setMedia(AnswerType answerType, String mediaUrl) {
         AnswerType resolvedType = Objects.requireNonNull(answerType, "AnswerType cannot be null");
-        if ((resolvedType == AnswerType.IMAGE || resolvedType == AnswerType.VIDEO) && (mediaUrl == null || mediaUrl.isBlank())) {
+        if (resolvedType != AnswerType.TEXT && (mediaUrl == null || mediaUrl.isBlank())) {
             throw new MissingMediaUrlException(this.id, resolvedType);
+        }
+        if (resolvedType == AnswerType.AUDIO && isYoutube(mediaUrl)) {
+            throw new UnsupportedAudioUrlException();
         }
         this.answerType = resolvedType;
         this.mediaUrl = resolvedType == AnswerType.TEXT ? null : mediaUrl;
+    }
+
+    private static boolean isYoutube(String url) {
+        try {
+            String host = URI.create(url.strip()).getHost();
+            return host != null && (host.equals("youtu.be") || host.equals("youtube.com") || host.endsWith(".youtube.com")
+                    || host.equals("youtube-nocookie.com") || host.endsWith(".youtube-nocookie.com"));
+        } catch (IllegalArgumentException e) {
+            return false; // not a URL at all: the web layer's URL check reports that
+        }
     }
 
     public void toggleDailyDouble() {

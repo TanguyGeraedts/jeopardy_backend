@@ -302,6 +302,11 @@ public class GameSession {
         requireTeam(teamId).setScore(score);
     }
 
+    /** The sound the board plays when this team buzzes. Null = automatic. Allowed any time, even mid-clue. */
+    public void setTeamBuzzerSound(TeamId teamId, BuzzerSound sound) {
+        requireTeam(teamId).setBuzzerSound(sound);
+    }
+
     public Optional<Player> findPlayer(PlayerId playerId) {
         return Optional.ofNullable(players.get(playerId));
     }

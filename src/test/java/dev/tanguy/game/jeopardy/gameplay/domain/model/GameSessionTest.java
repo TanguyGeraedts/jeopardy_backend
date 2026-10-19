@@ -8,6 +8,7 @@ import dev.tanguy.game.jeopardy.common.domain.model.id.QuizId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.TeamId;
 import dev.tanguy.game.jeopardy.gameplay.domain.event.GameSessionCreatedEvent;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.session.EmptyBoardException;
+import dev.tanguy.game.jeopardy.gameplay.domain.exception.team.TeamNotFoundException;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -156,6 +157,22 @@ class GameSessionTest {
         session.selectClue(second.getId());
         session.closeClue();
         assertThat(session.getState()).isEqualTo(GameState.GAME_OVER);
+    }
+
+    @Test
+    void hostPicksABuzzerSoundPerTeam() {
+        GameSession session = openClue();
+
+        session.setTeamBuzzerSound(red, BuzzerSound.GONG);
+        assertThat(session.getTeams()).filteredOn(t -> t.getId().equals(red)).first()
+                .extracting(Team::getBuzzerSound).isEqualTo(BuzzerSound.GONG);
+
+        session.setTeamBuzzerSound(red, null); // back to automatic
+        assertThat(session.getTeams()).filteredOn(t -> t.getId().equals(red)).first()
+                .extracting(Team::getBuzzerSound).isNull();
+
+        assertThatThrownBy(() -> session.setTeamBuzzerSound(TeamId.generate(), BuzzerSound.BELL))
+                .isInstanceOf(TeamNotFoundException.class);
     }
 
     @Test

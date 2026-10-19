@@ -46,6 +46,8 @@ public class GameSessionMapper {
                     .questionText(clue.getQuestion())
                     .answerText(clue.getAnswer())
                     .dailyDouble(clue.isDailyDouble())
+                    .mediaType(clue.getMediaType())
+                    .mediaUrl(clue.getMediaUrl())
                     .revealed(clue.isRevealed())
                     .build());
         }
@@ -58,6 +60,7 @@ public class GameSessionMapper {
                     .colour(team.getColour())
                     .score(team.getScore())
                     .lockedOut(team.isLockedOut())
+                    .buzzerSound(team.getBuzzerSound())
                     .build());
         }
 
@@ -103,7 +106,9 @@ public class GameSessionMapper {
                 entity.getPoints(),
                 entity.getQuestionText(),
                 entity.getAnswerText(),
-                entity.isDailyDouble());
+                entity.isDailyDouble(),
+                entity.getMediaType(),
+                entity.getMediaUrl());
         if (entity.isRevealed()) {
             clue.markAsRevealed();
         }
@@ -121,6 +126,7 @@ public class GameSessionMapper {
         Team team = new Team(new TeamId(entity.getId()), entity.getName(), entity.getExternalTeamId(), entity.getColour());
         team.addScore(entity.getScore());
         team.setLockedOut(entity.isLockedOut());
+        team.setBuzzerSound(entity.getBuzzerSound());
         // Team membership is derived from the players table.
         allPlayers.stream()
                 .filter(player -> entity.getId().equals(player.getTeamId()))

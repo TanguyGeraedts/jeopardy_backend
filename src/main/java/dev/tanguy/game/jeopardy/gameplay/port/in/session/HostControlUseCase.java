@@ -4,6 +4,7 @@ import dev.tanguy.game.jeopardy.common.domain.model.id.ClueId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.GameSessionId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.OwnerId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.TeamId;
+import dev.tanguy.game.jeopardy.gameplay.domain.model.BuzzerSound;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.GameSession;
 
 /**
@@ -23,4 +24,7 @@ public interface HostControlUseCase {
 
     /** Exactly one of delta / score is used: delta adds, score sets. */
     GameSession changeScore(GameSessionId sessionId, OwnerId requesterId, TeamId teamId, Integer delta, Integer score);
+
+    /** sound null = back to automatic. */
+    GameSession setTeamBuzzerSound(GameSessionId sessionId, OwnerId requesterId, TeamId teamId, BuzzerSound sound);
 }

@@ -24,6 +24,7 @@ public final class ApiPaths {
         public static final String JUDGE = BY_ID + "/judge";
         public static final String CLOSE_CLUE = BY_ID + "/clue/close";
         public static final String TEAM_SCORE = BY_ID + "/teams/{teamId}/score";
+        public static final String TEAM_BUZZER_SOUND = BY_ID + "/teams/{teamId}/buzzer-sound";
     }
 
     public static final class Creator {
