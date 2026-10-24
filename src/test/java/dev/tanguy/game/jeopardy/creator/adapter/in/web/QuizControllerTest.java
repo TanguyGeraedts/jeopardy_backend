@@ -56,7 +56,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = {QuizController.class, MockAuthController.class})
 @Import({SecurityConfig.class, MockJwtConfig.class, MockTokenService.class, CurrentUser.class})
-@ActiveProfiles("dev")
+@ActiveProfiles("test")
 class QuizControllerTest {
 
     private static final String QUIZZES = ApiPaths.Creator.BASE;

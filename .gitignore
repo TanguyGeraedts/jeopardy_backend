@@ -32,3 +32,4 @@ build/
 ### VS Code ###
 .vscode/
 /secrets/private_pkcs8.pem
+/secrets/lobby-public-online.pem

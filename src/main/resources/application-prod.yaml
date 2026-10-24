@@ -1,21 +1,13 @@
-spring:
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${OIDC_ISSUER_URI}      # discovery + signature + issuer validation
-          # jwk-set-uri: ${OIDC_JWKS_URI}     # only if the provider has no discovery document
-          # audiences: ${OIDC_AUDIENCE}       # strongly recommended: reject tokens meant for other apps
-
+# Server settings: everything comes from environment variables (see the Dockerfile).
 app:
   lobby:
-    base-url: ${LOBBY_BASE_URL}                     # e.g. https://lobby.geraedts.dev  (or http://lobby-backend:8080 inside docker)
+    base-url: ${LOBBY_BASE_URL}                     # e.g. https://api.lobby.geraedts.dev  (or http://lobby-backend:8080 inside docker)
     launch-url: ${JEOPARDY_PUBLIC_URL}/play/{gameSessionId}
     api-key: ${LOBBY_API_KEY:}
     public-key-location: ${LOBBY_PUBLIC_KEY_LOCATION}   # e.g. file:/secrets/lobby-public.pem
   security:
     demo-endpoints: false
-    jwt:
-      roles-claim-paths: [roles, realm_access.roles]
-      authority-prefix: ROLE_
-      uppercase: true
+    # Host logins: your Clerk PRODUCTION instance (keys pk_live_/sk_live_).
+    clerk:
+      issuer: ${CLERK_ISSUER}                       # e.g. https://clerk.yourdomain.com (Clerk dashboard > API keys)
+      authorized-parties: ${JEOPARDY_PUBLIC_URL}    # only tokens issued to your Jeopardy site

@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = {SecurityDemoController.class, MockAuthController.class})
 @Import({SecurityConfig.class, MockJwtConfig.class, MockTokenService.class, CurrentUser.class})
-@ActiveProfiles("dev")
+@ActiveProfiles("test")
 @TestPropertySource(properties = "app.security.demo-endpoints=true")
 class SecurityFlowTest {
 

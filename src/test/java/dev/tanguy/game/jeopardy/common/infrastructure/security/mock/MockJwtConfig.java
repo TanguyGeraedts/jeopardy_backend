@@ -20,7 +20,7 @@ import java.nio.charset.StandardCharsets;
 
 @Slf4j
 @Configuration
-@Profile("dev")
+@Profile("test")
 @EnableConfigurationProperties(MockAuthProperties.class)
 public class MockJwtConfig {
 
@@ -36,7 +36,7 @@ public class MockJwtConfig {
                 .build();
         // exp/nbf + issuer checks, same shape as the real OIDC validation
         decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(properties.issuer()));
-        log.warn("MOCK JWT authentication is ACTIVE (profile 'dev'). Never enable this profile in production.");
+        log.warn("Test-only mock JWT decoder (HS256) is active.");
         return decoder;
     }
 

@@ -47,7 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = {CategoryController.class, MockAuthController.class})
 @Import({SecurityConfig.class, MockJwtConfig.class, MockTokenService.class, CurrentUser.class})
-@ActiveProfiles("dev")
+@ActiveProfiles("test")
 class CategoryControllerTest {
 
     private static final String ALICE = "11111111-1111-1111-1111-111111111111";

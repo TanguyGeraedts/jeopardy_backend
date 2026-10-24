@@ -117,6 +117,17 @@ class QuizAggregateTest {
                 .isInstanceOf(UnsupportedAudioUrlException.class);
         assertThatThrownBy(() -> history.updateQuestion(q.getId(), 200, "Q?", "A", AnswerType.AUDIO, "https://www.youtube.com/watch?v=dQw4w9WgXcQ", false))
                 .isInstanceOf(UnsupportedAudioUrlException.class);
+        // Hosts are case-insensitive, and unencoded characters must not make the check give up.
+        for (String sneaky : new String[] {
+                "https://WWW.YouTube.com/watch?v=dQw4w9WgXcQ",
+                "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=a b",
+                "https://youtu.be./dQw4w9WgXcQ"}) {
+            assertThatThrownBy(() -> history.updateQuestion(q.getId(), 200, "Q?", "A", AnswerType.AUDIO, sneaky, false))
+                    .as(sneaky)
+                    .isInstanceOf(UnsupportedAudioUrlException.class);
+        }
+        // Look-alikes are not YouTube.
+        history.updateQuestion(q.getId(), 200, "Q?", "A", AnswerType.AUDIO, "https://notyoutube.com/clip.mp3", false);
 
         history.updateQuestion(q.getId(), 200, "Q?", "A", AnswerType.AUDIO, "https://example.com/intro.mp3", false);
         assertThat(history.getQuestion(q.getId()).getAnswerType()).isEqualTo(AnswerType.AUDIO);

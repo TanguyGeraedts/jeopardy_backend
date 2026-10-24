@@ -1,17 +1,11 @@
 package dev.tanguy.game.jeopardy.gameplay.core.session;
 
 import dev.tanguy.game.jeopardy.common.domain.model.id.ClueId;
-import dev.tanguy.game.jeopardy.common.events.DomainEventPublisher;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.clue.ClueNotFoundException;
-import dev.tanguy.game.jeopardy.gameplay.domain.exception.session.GameSessionNotFoundException;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.ClueState;
-import dev.tanguy.game.jeopardy.gameplay.domain.model.GameSession;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.AnswerClueCommand;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.AnswerClueResult;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.AnswerClueUseCase;
-import dev.tanguy.game.jeopardy.gameplay.port.out.session.LoadGameSessionPort;
-import dev.tanguy.game.jeopardy.gameplay.port.out.session.SaveGameSessionPort;
-import dev.tanguy.game.jeopardy.gameplay.port.out.session.GameSessionUpdatesPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -19,36 +13,28 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AnswerClueUseCaseImpl implements AnswerClueUseCase {
 
-    private final LoadGameSessionPort loadGameSessionPort;
-    private final SaveGameSessionPort saveGameSessionPort;
-    private final DomainEventPublisher domainEventPublisher;
-    private final GameSessionUpdatesPort gameSessionUpdatesPort;
+    private final GameSessionUpdater updater;
 
     @Override
     public AnswerClueResult answerClue(AnswerClueCommand command) {
-        GameSession session = loadGameSessionPort.loadGameSessionById(command.sessionId())
-                .orElseThrow(() -> new GameSessionNotFoundException(command.sessionId()));
+        return updater.updateOwned(command.sessionId(), command.requesterId(), session -> {
+            ClueId activeClueId = session.getActiveClueId();
+            if (activeClueId == null || !activeClueId.equals(command.clueId())) {
+                throw new ClueNotFoundException(command.clueId());
+            }
 
-        ClueId activeClueId = session.getActiveClueId();
-        if (activeClueId == null || !activeClueId.equals(command.clueId())) {
-            throw new ClueNotFoundException(command.clueId());
-        }
+            ClueState clue = session.getClues().get(activeClueId);
+            if (clue == null) {
+                throw new ClueNotFoundException(activeClueId);
+            }
 
-        ClueState clue = session.getClues().get(activeClueId);
-        if (clue == null) {
-            throw new ClueNotFoundException(activeClueId);
-        }
+            boolean isCorrect = matches(command.answer(), clue.getAnswer());
+            int scoreDelta = isCorrect ? clue.getValue() : -clue.getValue();
 
-        boolean isCorrect = matches(command.answer(), clue.getAnswer());
-        int scoreDelta = isCorrect ? clue.getValue() : -clue.getValue();
+            session.evaluateAnswer(isCorrect);
 
-        session.evaluateAnswer(isCorrect);
-
-        saveGameSessionPort.saveGameSession(session);
-        domainEventPublisher.publishAll(session.pullDomainEvents());
-        gameSessionUpdatesPort.sessionChanged(session);
-
-        return new AnswerClueResult(isCorrect, scoreDelta, clue.getAnswer());
+            return new AnswerClueResult(isCorrect, scoreDelta, clue.getAnswer());
+        });
     }
 
     private boolean matches(String submitted, String expected) {

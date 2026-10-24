@@ -10,8 +10,10 @@ import dev.tanguy.game.jeopardy.creator.domain.event.question.UnsupportedAudioUr
 import lombok.Getter;
 import lombok.Setter;
 
-import java.net.URI;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Getter
 public class Question {
@@ -95,14 +97,21 @@ public class Question {
         this.mediaUrl = resolvedType == AnswerType.TEXT ? null : mediaUrl;
     }
 
+    /**
+     * Host part of a URL, read leniently: unlike URI.create it doesn't give up on spaces or other unencoded
+     * characters, so such a link can't slip past the YouTube rule.
+     */
+    private static final Pattern URL_HOST = Pattern.compile("^\\s*[a-zA-Z][a-zA-Z0-9+.-]*://(?:[^@/?#]*@)?([^/?#:\\s]+)");
+
     private static boolean isYoutube(String url) {
-        try {
-            String host = URI.create(url.strip()).getHost();
-            return host != null && (host.equals("youtu.be") || host.equals("youtube.com") || host.endsWith(".youtube.com")
-                    || host.equals("youtube-nocookie.com") || host.endsWith(".youtube-nocookie.com"));
-        } catch (IllegalArgumentException e) {
+        Matcher matcher = URL_HOST.matcher(url);
+        if (!matcher.find()) {
             return false; // not a URL at all: the web layer's URL check reports that
         }
+        // Hosts are case-insensitive, and a trailing dot ("youtube.com.") is the same host.
+        String host = matcher.group(1).toLowerCase(Locale.ROOT).replaceAll("\\.$", "");
+        return host.equals("youtu.be") || host.equals("youtube.com") || host.endsWith(".youtube.com")
+                || host.equals("youtube-nocookie.com") || host.endsWith(".youtube-nocookie.com");
     }
 
     public void toggleDailyDouble() {

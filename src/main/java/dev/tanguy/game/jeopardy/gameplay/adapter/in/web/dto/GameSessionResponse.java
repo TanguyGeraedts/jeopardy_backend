@@ -26,7 +26,10 @@ public record GameSessionResponse(
 ) {
     public record ClueSummary(
             String id, String category, int value, String question, boolean revealed, boolean dailyDouble, String answer,
-            /** "IMAGE" or "VIDEO" (a YouTube link or a direct video file), shown with the question. Null = text only. */
+            /**
+             * Shown with the question: "IMAGE", "VIDEO" (a YouTube link or a video file) or "AUDIO" (sound only, a file,
+             * never YouTube). Null = text only.
+             */
             String mediaType,
             String mediaUrl
     ) {}

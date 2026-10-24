@@ -1,0 +1,11 @@
+# Tests only: a throwaway HS256 key so tests can mint tokens (test sources: security/mock).
+# The real app only accepts Clerk tokens (ClerkJwtConfig).
+app:
+  security:
+    demo-endpoints: true
+    mock:
+      issuer: http://localhost/test-issuer
+      secret: test-only-secret-that-is-at-least-32-bytes-long!!
+      ttl: 1h
+    jwt:
+      roles-claim-paths: [roles]

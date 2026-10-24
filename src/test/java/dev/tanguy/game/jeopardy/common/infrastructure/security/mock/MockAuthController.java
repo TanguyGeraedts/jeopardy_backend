@@ -12,7 +12,7 @@ import java.util.List;
 
 /** DEV ONLY: does not exist in any other profile. */
 @RestController
-@Profile("dev")
+@Profile("test")
 @RequestMapping("/api/public/mock-auth")
 @RequiredArgsConstructor
 public class MockAuthController {

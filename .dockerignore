@@ -1,0 +1,7 @@
+target/
+secrets/
+.idea/
+.git/
+http/
+infrastructure/
+*.iml

@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-@Profile("dev")
+@Profile("test")
 @RequiredArgsConstructor
 public class MockTokenService {
 

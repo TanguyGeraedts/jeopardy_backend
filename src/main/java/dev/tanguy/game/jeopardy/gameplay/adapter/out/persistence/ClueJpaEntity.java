@@ -42,7 +42,7 @@ public class ClueJpaEntity {
     @Column(name = "is_daily_double", nullable = false)
     private boolean dailyDouble;
 
-    /** IMAGE or VIDEO, shown with the question. Null for a text-only clue. */
+    /** IMAGE, VIDEO or AUDIO, shown/played with the question. Null for a text-only clue. */
     @Enumerated(EnumType.STRING)
     @Column(name = "media_type", length = 10)
     private ClueMediaType mediaType;

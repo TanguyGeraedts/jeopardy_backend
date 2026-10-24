@@ -85,7 +85,9 @@ public class GameSessionController {
 
     @GetMapping(ApiPaths.Gameplay.BY_ID)
     public ResponseEntity<ApiResponse<GameSessionResponse>> getGameSession(@PathVariable UUID id) {
-        GameSession session = getGameSessionUseCase.getGameSession(new GetGameSessionQuery(new GameSessionId(id)));
+        // Owner only: this view contains the answers.
+        OwnerId requesterId = currentUser.require().ownerId();
+        GameSession session = getGameSessionUseCase.getGameSession(new GetGameSessionQuery(new GameSessionId(id), requesterId));
 
         return ResponseEntity.ok(ApiResponse.success(GameSessionResponseMapper.toResponse(session)));
     }
@@ -97,6 +99,7 @@ public class GameSessionController {
     ) {
         AddPlayerCommand command = new AddPlayerCommand(
                 new GameSessionId(id),
+                currentUser.require().ownerId(),
                 new PlayerId(request.playerId()),
                 request.playerName(),
                 request.externalTeamId(),
@@ -123,6 +126,7 @@ public class GameSessionController {
     ) {
         AnswerClueCommand command = new AnswerClueCommand(
                 new GameSessionId(id),
+                currentUser.require().ownerId(),
                 ClueId.of(request.clueId()),
                 request.answer()
         );

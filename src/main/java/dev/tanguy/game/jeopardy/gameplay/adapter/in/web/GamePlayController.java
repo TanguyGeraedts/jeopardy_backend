@@ -17,7 +17,6 @@ import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.mapper.GameSessionRespon
 import dev.tanguy.game.jeopardy.gameplay.domain.model.GameSession;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.BuzzCommand;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.BuzzUseCase;
-import dev.tanguy.game.jeopardy.gameplay.port.in.session.GetGameSessionQuery;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.GetGameSessionUseCase;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.HostControlUseCase;
 import jakarta.servlet.http.HttpServletResponse;
@@ -61,7 +60,8 @@ public class GamePlayController {
     /** Public on purpose: phones have no login. The stream never contains answers. */
     @GetMapping(value = ApiPaths.Gameplay.EVENTS, produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter events(@PathVariable UUID id, HttpServletResponse response) {
-        GameSession session = getGameSessionUseCase.getGameSession(new GetGameSessionQuery(new GameSessionId(id)));
+        // Unchecked load is fine here: liveUpdates only ever sends the public, answer-free view.
+        GameSession session = getGameSessionUseCase.getGameSessionForLiveView(new GameSessionId(id));
         // no-transform: proxies (incl. the Next.js /api rewrite) must not gzip/buffer the stream.
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache, no-transform");
         response.setHeader("X-Accel-Buffering", "no");
