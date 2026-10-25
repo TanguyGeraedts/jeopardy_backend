@@ -24,7 +24,7 @@ public record LobbyProperties(
         @DefaultValue("Jeopardy") String gameName,
         /** Optional image URL shown instead of gameName at the top of the lobby. Blank = the name as text. */
         String gameBanner,
-        @DefaultValue("#0F172A") String backgroundColor,
+        @DefaultValue("#060b2e") String backgroundColor,
         /** Optional image URL behind the lobby (cover, darkened). Blank = backgroundColor only. */
         String backgroundImage,
         /** Players needed in the lobby before its host (the first player to join) can start the game. */

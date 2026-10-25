@@ -16,7 +16,7 @@ COPY mvnw pom.xml ./
 RUN sed -i 's/\r$//' mvnw && chmod +x mvnw
 RUN ./mvnw -B -q dependency:go-offline
 COPY src src
-# Tests run in CI/locally; JeopardyApplicationTests needs a JwtDecoder that only exists with a real login provider.
+# Tests run in the GitHub workflow before this image is built (they need a Postgres, which a docker build doesn't have).
 RUN ./mvnw -B -q -DskipTests package
 
 FROM eclipse-temurin:26-jre
@@ -24,8 +24,10 @@ WORKDIR /app
 RUN useradd -r -u 1001 app
 COPY --from=build /app/target/*.jar app.jar
 USER app
+# Heap follows the container's memory limit (mem_limit in the VPS compose file), leaving room for the JVM itself.
 ENV SERVER_PORT=8080 \
     SPRING_PROFILES_ACTIVE=prod \
-    SPRING_JPA_SHOW_SQL=false
+    SPRING_JPA_SHOW_SQL=false \
+    JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75"
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

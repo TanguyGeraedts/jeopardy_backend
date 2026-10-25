@@ -1,0 +1,71 @@
+# Jeopardy on the VPS: Postgres + backend + frontend, behind nginx on the host.
+#   nginx  jeopardy.geraedts.dev  -> 127.0.0.1:3200 (frontend). The frontend forwards /api to the backend
+#   (docs/adr/0001): the backend has no host port and only containers can reach it.
+# Lives in /opt/jeopardy with a .env next to it (copy .env.example). Setup and updates: README.md next to this file.
+name: jeopardy
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jeopardy
+      POSTGRES_USER: jeopardy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "jeopardy", "-d", "jeopardy"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    mem_limit: 256m
+    # No "ports:" and not on gamenet: only the Jeopardy backend can reach the database.
+    networks: [default]
+
+  jeopardy-backend:
+    image: ghcr.io/tanguygeraedts/jeopardy_backend:${JEOPARDY_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/jeopardy
+      SPRING_DATASOURCE_USERNAME: jeopardy
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      CLERK_ISSUER: ${CLERK_ISSUER:?Set CLERK_ISSUER in .env}
+      JEOPARDY_PUBLIC_URL: ${JEOPARDY_PUBLIC_URL:-https://jeopardy.geraedts.dev}
+      # The lobby stack's backend, over the shared gamenet network.
+      LOBBY_BASE_URL: http://lobby-backend:8080
+      LOBBY_PUBLIC_KEY_LOCATION: file:/secrets/lobby-public.pem
+      # The lobby's look comes from application.yaml in the image. To change it here, uncomment and set in .env
+      # (an empty value means "no image", so don't uncomment one you leave empty):
+      # LOBBY_GAME_NAME: ${LOBBY_GAME_NAME}
+      # LOBBY_GAME_BANNER: ${LOBBY_GAME_BANNER}
+      # LOBBY_BACKGROUND_COLOR: ${LOBBY_BACKGROUND_COLOR}
+      # LOBBY_BACKGROUND_IMAGE: ${LOBBY_BACKGROUND_IMAGE}
+    volumes:
+      # The lobby's PRODUCTION public key (verifies its handoff and player tokens).
+      - ${LOBBY_PUBLIC_KEY:-/opt/lobby/secrets/public.pem}:/secrets/lobby-public.pem:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 768m
+    networks: [default, gamenet]
+
+  jeopardy-frontend:
+    # Built with the Clerk publishable key and BACKEND_URL=http://jeopardy-backend:8080 baked in (frontend workflow).
+    image: ghcr.io/tanguygeraedts/jeopardy_frontend:${JEOPARDY_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:?Set CLERK_SECRET_KEY in .env}
+    depends_on: [jeopardy-backend]
+    ports:
+      - "127.0.0.1:3200:3000"
+    mem_limit: 256m
+    networks: [default]
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+  gamenet:
+    external: true

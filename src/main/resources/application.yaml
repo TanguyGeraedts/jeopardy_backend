@@ -17,11 +17,13 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
-  management:
-    endpoints:
-      web:
-        exposure:
-          include: health
+
+# Only /actuator/health is public (SecurityConfig); nothing else is exposed.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
 
 app:
   lobby:
@@ -30,7 +32,7 @@ app:
     public-key-location: file:./secrets/lobby-public.pem
     game-name: ${LOBBY_GAME_NAME:Jeopardy}
     game-banner: ${LOBBY_GAME_BANNER:https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSfg_368UuXqIhyTUzBLq3h9ijRTR8MXn6gYn06dVssSUMHWxsoy6t_G1ZS&s=10}
-    background-color: ${LOBBY_BACKGROUND_COLOR:#0F172A}
+    background-color: ${LOBBY_BACKGROUND_COLOR:#060b2e}
     background-image: ${LOBBY_BACKGROUND_IMAGE:https://assets-prd.ignimgs.com/2022/07/15/jeopardy-1657926877160.png}
   security:
     clerk:
