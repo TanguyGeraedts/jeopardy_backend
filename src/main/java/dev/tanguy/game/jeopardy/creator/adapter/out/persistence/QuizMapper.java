@@ -9,6 +9,7 @@ import dev.tanguy.game.jeopardy.creator.domain.model.Question;
 import dev.tanguy.game.jeopardy.creator.domain.model.Quiz;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,12 +33,16 @@ public class QuizMapper {
                 .map(categoryEntity -> toCategoryDomain(categoryEntity, quizId))
                 .toList();
 
-        return new Quiz(
+        Quiz quiz = new Quiz(
                 quizId,
                 new OwnerId(entity.getOwnerId()),
                 entity.getName(),
                 categories
         );
+        quiz.restoreListing(
+                entity.isPublished(), entity.getPublishedAt(), entity.getAuthorName(), entity.getTopics(),
+                entity.getTimesPlayed(), entity.getCreatedAt(), entity.getUpdatedAt());
+        return quiz;
     }
 
     private Category toCategoryDomain(CategoryJpaEntity entity, QuizId quizId) {
@@ -74,6 +79,12 @@ public class QuizMapper {
                 .id(UUID.fromString(domain.getId().value()))
                 .ownerId(domain.getOwnerId().value())
                 .name(domain.getName())
+                .published(domain.isPublished())
+                .publishedAt(domain.getPublishedAt())
+                .authorName(domain.getAuthorName())
+                .topics(new HashSet<>(domain.getTopics()))
+                .createdAt(domain.getCreatedAt())
+                .updatedAt(domain.getUpdatedAt())
                 .build();
 
         List<Category> categories = domain.getCategories();

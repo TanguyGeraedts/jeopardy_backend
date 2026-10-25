@@ -6,7 +6,7 @@ import dev.tanguy.game.jeopardy.creator.api.QuizSnapshot;
 import dev.tanguy.game.jeopardy.creator.api.QuizSnapshot.CategorySnapshot;
 import dev.tanguy.game.jeopardy.creator.api.QuizSnapshot.QuestionSnapshot;
 import dev.tanguy.game.jeopardy.creator.api.QuizSnapshotQuery;
-import dev.tanguy.game.jeopardy.creator.core.OwnedQuizFinder;
+import dev.tanguy.game.jeopardy.creator.core.HostableQuizFinder;
 import dev.tanguy.game.jeopardy.creator.domain.model.AnswerType;
 import dev.tanguy.game.jeopardy.creator.domain.model.Quiz;
 import lombok.RequiredArgsConstructor;
@@ -16,11 +16,11 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class QuizSnapshotQueryImpl implements QuizSnapshotQuery {
 
-    private final OwnedQuizFinder ownedQuizFinder;
+    private final HostableQuizFinder hostableQuizFinder;
 
     @Override
     public QuizSnapshot getSnapshot(QuizId quizId, OwnerId requesterId) {
-        Quiz quiz = ownedQuizFinder.find(quizId, requesterId);
+        Quiz quiz = hostableQuizFinder.find(quizId, requesterId);
 
         return new QuizSnapshot(
                 quiz.getId(),

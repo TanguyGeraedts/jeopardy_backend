@@ -8,6 +8,6 @@ import java.util.List;
 
 public interface LoadBoardTemplatePort {
 
-    /** Copies the quiz into fresh clues. Fails if the requester doesn't own the quiz. */
+    /** Copies the quiz into fresh clues. Fails unless the quiz is the requester's own or published. */
     List<ClueState> loadCluesForQuiz(QuizId quizId, OwnerId requesterId);
 }

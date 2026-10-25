@@ -10,8 +10,13 @@ import dev.tanguy.game.jeopardy.creator.domain.event.question.MissingMediaUrlExc
 import dev.tanguy.game.jeopardy.creator.domain.event.question.UnsupportedAudioUrlException;
 import dev.tanguy.game.jeopardy.creator.domain.event.quiz.CategoryNotFoundException;
 import dev.tanguy.game.jeopardy.creator.domain.event.quiz.DuplicateCategoryNameException;
+import dev.tanguy.game.jeopardy.creator.domain.event.quiz.QuizNotPublishableException;
+import dev.tanguy.game.jeopardy.creator.domain.event.quiz.TooManyTopicsException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -156,5 +161,70 @@ class QuizAggregateTest {
         history.addQuestion(question(200));
 
         assertThat(history.getQuestions()).hasSize(1);
+    }
+
+    // ---------- listing (Discover) ----------
+
+    private static final Instant NOW = Instant.parse("2026-10-25T20:00:00Z");
+
+    @Test
+    void publish_needsAtLeastOneQuestion() {
+        assertThatThrownBy(() -> quiz.publish("Tanguy", NOW)).isInstanceOf(QuizNotPublishableException.class);
+        assertThat(quiz.isPublished()).isFalse();
+    }
+
+    @Test
+    void publish_needsAnAuthorName() {
+        history.addQuestion(question(100));
+
+        assertThatThrownBy(() -> quiz.publish("  ", NOW)).isInstanceOf(QuizNotPublishableException.class);
+    }
+
+    @Test
+    void publish_thenUnpublish() {
+        history.addQuestion(question(100));
+
+        quiz.publish("  Tanguy ", NOW);
+        quiz.publish("Tanguy G", NOW.plusSeconds(60)); // re-publishing keeps the original date
+
+        assertThat(quiz.isPublished()).isTrue();
+        assertThat(quiz.getAuthorName()).isEqualTo("Tanguy G");
+        assertThat(quiz.getPublishedAt()).isEqualTo(NOW);
+
+        quiz.unpublish();
+        assertThat(quiz.isPublished()).isFalse();
+        assertThat(quiz.getPublishedAt()).isNull();
+    }
+
+    @Test
+    void topics_atMostThree() {
+        quiz.changeTopics(List.of(QuizTopic.MUSIC, QuizTopic.HISTORY, QuizTopic.MUSIC));
+        assertThat(quiz.getTopics()).containsExactlyInAnyOrder(QuizTopic.MUSIC, QuizTopic.HISTORY);
+
+        assertThatThrownBy(() -> quiz.changeTopics(List.of(QuizTopic.MUSIC, QuizTopic.HISTORY, QuizTopic.SPORTS, QuizTopic.GAMES)))
+                .isInstanceOf(TooManyTopicsException.class);
+        assertThat(quiz.getTopics()).hasSize(2);
+    }
+
+    @Test
+    void duplicate_isAPrivateCopyWithNewIds() {
+        history.addQuestion(question(100));
+        quiz.changeTopics(List.of(QuizTopic.HISTORY));
+        quiz.publish("Tanguy", NOW);
+
+        Quiz copy = quiz.duplicate(QuizId.generate(), "Trivia (copy)");
+
+        assertThat(copy.getOwnerId()).isEqualTo(quiz.getOwnerId());
+        assertThat(copy.isPublished()).isFalse();
+        assertThat(copy.getTopics()).containsExactly(QuizTopic.HISTORY);
+        assertThat(copy.getCategories()).singleElement().satisfies(category -> {
+            assertThat(category.getName()).isEqualTo("History");
+            assertThat(category.getId()).isNotEqualTo(history.getId());
+            assertThat(category.getQuestions()).singleElement().satisfies(q -> {
+                assertThat(q.getPoints()).isEqualTo(100);
+                assertThat(q.getId()).isNotEqualTo(history.getQuestions().getFirst().getId());
+                assertThat(q.getCategoryId()).isEqualTo(category.getId());
+            });
+        });
     }
 }

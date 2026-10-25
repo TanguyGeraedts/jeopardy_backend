@@ -28,9 +28,19 @@ public final class ApiPaths {
         public static final String TEAM_BUZZER_SOUND = BY_ID + "/teams/{teamId}/buzzer-sound";
     }
 
+    /** Everyone's published quizzes (plus your own), as board shapes without questions. */
+    public static final class Discover {
+        public static final String BASE = V1_BASE + "/discover";
+        public static final String BY_ID = "/{id}";
+    }
+
     public static final class Creator {
         public static final String BASE = V1_BASE + "/quizzes";
         public static final String BY_ID = "/{id}";
+
+        public static final String PUBLICATION = BY_ID + "/publication";
+        public static final String TOPICS = BY_ID + "/topics";
+        public static final String DUPLICATE = BY_ID + "/duplicate";
 
         public static final String CATEGORIES = BY_ID + "/categories";
         public static final String CATEGORY_BY_ID = CATEGORIES + "/{categoryId}";

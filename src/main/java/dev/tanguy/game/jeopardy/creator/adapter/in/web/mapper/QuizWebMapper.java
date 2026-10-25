@@ -3,6 +3,8 @@ package dev.tanguy.game.jeopardy.creator.adapter.in.web.mapper;
 import dev.tanguy.game.jeopardy.common.domain.model.id.OwnerId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.QuizId;
 import dev.tanguy.game.jeopardy.creator.adapter.in.web.dto.CreateQuizRequest;
+import dev.tanguy.game.jeopardy.creator.adapter.in.web.dto.DiscoverQuizResponse;
+import dev.tanguy.game.jeopardy.creator.adapter.in.web.dto.DiscoverQuizResponse.CategoryShape;
 import dev.tanguy.game.jeopardy.creator.adapter.in.web.dto.QuizResponse;
 import dev.tanguy.game.jeopardy.creator.adapter.in.web.dto.QuizResponse.CategoryResponse;
 import dev.tanguy.game.jeopardy.creator.adapter.in.web.dto.QuizResponse.QuestionResponse;
@@ -16,6 +18,7 @@ import dev.tanguy.game.jeopardy.creator.port.in.quiz.GetQuizQuery;
 import dev.tanguy.game.jeopardy.creator.port.in.quiz.GetQuizzesByOwnerQuery;
 import dev.tanguy.game.jeopardy.creator.port.in.quiz.UpdateQuizCommand;
 
+import java.util.List;
 import java.util.UUID;
 
 public final class QuizWebMapper {
@@ -46,8 +49,37 @@ public final class QuizWebMapper {
         return new QuizResponse(
                 UUID.fromString(quiz.getId().value()),
                 quiz.getName(),
-                quiz.getCategories().stream().map(QuizWebMapper::toCategoryResponse).toList()
+                quiz.getCategories().stream().map(QuizWebMapper::toCategoryResponse).toList(),
+                quiz.isPublished(),
+                quiz.getPublishedAt(),
+                quiz.getAuthorName(),
+                topicNames(quiz),
+                quiz.getTimesPlayed(),
+                quiz.getUpdatedAt()
         );
+    }
+
+    /** Board shape only: no questions or answers. */
+    public static DiscoverQuizResponse toDiscoverResponse(Quiz quiz, OwnerId requesterId) {
+        return new DiscoverQuizResponse(
+                UUID.fromString(quiz.getId().value()),
+                quiz.getName(),
+                quiz.getAuthorName(),
+                topicNames(quiz),
+                quiz.getTimesPlayed(),
+                quiz.getPublishedAt(),
+                quiz.isPublished(),
+                quiz.getOwnerId().equals(requesterId),
+                quiz.questionCount(),
+                quiz.getCategories().stream()
+                        .map(c -> new CategoryShape(c.getName(), c.getQuestions().size()))
+                        .toList()
+        );
+    }
+
+    /** In the enum's order, so the list is stable between requests. */
+    private static List<String> topicNames(Quiz quiz) {
+        return quiz.getTopics().stream().sorted().map(Enum::name).toList();
     }
 
     public static CategoryResponse toCategoryResponse(Category category) {

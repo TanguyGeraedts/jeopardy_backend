@@ -7,6 +7,7 @@ import dev.tanguy.game.jeopardy.gameplay.domain.model.GameSession;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.CreateGameSessionCommand;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.CreateGameSessionUseCase;
 import dev.tanguy.game.jeopardy.gameplay.port.out.board.LoadBoardTemplatePort;
+import dev.tanguy.game.jeopardy.gameplay.port.out.board.RecordQuizPlayPort;
 import dev.tanguy.game.jeopardy.gameplay.port.out.lobby.LobbyPort;
 import dev.tanguy.game.jeopardy.gameplay.port.out.lobby.LobbyPort.CreateLobbyRequest;
 import dev.tanguy.game.jeopardy.gameplay.port.out.lobby.LobbyPort.LobbyInfo;
@@ -21,6 +22,7 @@ import java.util.List;
 public class CreateGameSessionUseCaseImpl implements CreateGameSessionUseCase {
 
     private final LoadBoardTemplatePort loadBoardTemplatePort;
+    private final RecordQuizPlayPort recordQuizPlayPort;
     private final SaveGameSessionPort saveGameSessionPort;
     private final LobbyPort lobbyPort;
     private final DomainEventPublisher domainEventPublisher;
@@ -48,6 +50,7 @@ public class CreateGameSessionUseCaseImpl implements CreateGameSessionUseCase {
             throw e;
         }
         domainEventPublisher.publishAll(session.pullDomainEvents());
+        recordQuizPlayPort.recordPlay(command.quizId());
 
         return session.getId();
     }
