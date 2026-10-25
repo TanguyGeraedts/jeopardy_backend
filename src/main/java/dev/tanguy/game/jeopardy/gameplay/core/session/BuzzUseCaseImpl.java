@@ -9,6 +9,8 @@ import dev.tanguy.game.jeopardy.gameplay.port.out.lobby.LobbyPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+
 @Service
 @RequiredArgsConstructor
 public class BuzzUseCaseImpl implements BuzzUseCase {
@@ -18,6 +20,8 @@ public class BuzzUseCaseImpl implements BuzzUseCase {
 
     @Override
     public boolean buzz(BuzzCommand command) {
+        // Timestamp on arrival: waiting for the session lock (other buzzes, DB saves) must not count against the player.
+        Instant receivedAt = Instant.now();
         // Verify outside the lock: it's CPU work and doesn't need the session.
         LobbyPlayerIdentity identity = lobbyPort.verifyPlayerToken(command.playerToken());
         PlayerId playerId = new PlayerId(identity.playerId());
@@ -28,7 +32,7 @@ public class BuzzUseCaseImpl implements BuzzUseCase {
                     || session.findPlayer(playerId).isEmpty()) {
                 throw new InvalidPlayerTokenException("This player token is not valid for this game.");
             }
-            return session.registerBuzz(playerId);
+            return session.registerBuzz(playerId, receivedAt);
         });
     }
 }

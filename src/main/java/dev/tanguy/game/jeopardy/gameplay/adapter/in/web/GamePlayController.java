@@ -100,6 +100,11 @@ public class GamePlayController {
         return ok(hostControlUseCase.closeClue(sessionId(id), owner()));
     }
 
+    @PostMapping(ApiPaths.Gameplay.END_GAME)
+    public ResponseEntity<ApiResponse<GameSessionResponse>> endGame(@PathVariable UUID id) {
+        return ok(hostControlUseCase.endGame(sessionId(id), owner()));
+    }
+
     @PostMapping(ApiPaths.Gameplay.TEAM_SCORE)
     public ResponseEntity<ApiResponse<GameSessionResponse>> changeScore(
             @PathVariable UUID id, @PathVariable UUID teamId, @RequestBody ChangeScoreRequest request) {

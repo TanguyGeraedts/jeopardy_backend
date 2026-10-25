@@ -22,6 +22,9 @@ public interface HostControlUseCase {
 
     GameSession closeClue(GameSessionId sessionId, OwnerId requesterId);
 
+    /** Stop early: straight to GAME_OVER (the final scoreboard) with the scores as they are. */
+    GameSession endGame(GameSessionId sessionId, OwnerId requesterId);
+
     /** Exactly one of delta / score is used: delta adds, score sets. */
     GameSession changeScore(GameSessionId sessionId, OwnerId requesterId, TeamId teamId, Integer delta, Integer score);
 

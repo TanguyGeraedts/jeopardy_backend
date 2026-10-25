@@ -8,9 +8,11 @@ import dev.tanguy.game.jeopardy.common.domain.model.id.QuizId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.TeamId;
 import dev.tanguy.game.jeopardy.gameplay.domain.event.GameSessionCreatedEvent;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.session.EmptyBoardException;
+import dev.tanguy.game.jeopardy.gameplay.domain.exception.session.IllegalGameStateTransitionException;
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.team.TeamNotFoundException;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -64,8 +66,17 @@ class GameSessionTest {
         session.addPlayer(cas, "Cas", blue);
         session.startGame();
         session.selectClue(first.getId());
-        session.openBuzzers();
+        session.openBuzzers(OPENED);
         return session;
+    }
+
+    private static final Instant OPENED = Instant.parse("2026-10-25T20:00:00Z");
+    private long clockMs = 0;
+
+    /** A buzz time 100 ms after the previous one (the first is 100 ms after the buzzers opened). */
+    private Instant later() {
+        clockMs += 100;
+        return OPENED.plusMillis(clockMs);
     }
 
     private static int score(GameSession session, TeamId teamId) {
@@ -80,30 +91,30 @@ class GameSessionTest {
         session.startGame();
         session.selectClue(first.getId());
 
-        assertThat(session.registerBuzz(ana)).isFalse();
+        assertThat(session.registerBuzz(ana, later())).isFalse();
         assertThat(session.getState()).isEqualTo(GameState.CLUE_READING);
-        assertThat(session.getBuzzQueue()).isEmpty();
+        assertThat(session.getBuzzes()).isEmpty();
     }
 
     @Test
     void firstBuzzAnswersAndLaterBuzzesQueueOnePerTeam() {
         GameSession session = openClue();
 
-        assertThat(session.registerBuzz(cas)).isTrue();
-        assertThat(session.registerBuzz(ana)).isTrue();
-        assertThat(session.registerBuzz(ben)).isFalse(); // red already in line
-        assertThat(session.registerBuzz(cas)).isFalse(); // mashing
+        assertThat(session.registerBuzz(cas, later())).isTrue();
+        assertThat(session.registerBuzz(ana, later())).isTrue();
+        assertThat(session.registerBuzz(ben, later())).isFalse(); // red already in line
+        assertThat(session.registerBuzz(cas, later())).isFalse(); // mashing
 
         assertThat(session.getState()).isEqualTo(GameState.ANSWER_EVALUATION);
         assertThat(session.getCurrentBuzzedPlayerId()).isEqualTo(cas);
-        assertThat(session.getBuzzQueue()).containsExactly(cas, ana);
+        assertThat(session.getBuzzes()).extracting(Buzz::playerId).containsExactly(cas, ana);
     }
 
     @Test
     void wrongAnswerLocksTheTeamOutAndTheNextInLineIsUp() {
         GameSession session = openClue();
-        session.registerBuzz(cas);
-        session.registerBuzz(ana);
+        session.registerBuzz(cas, later());
+        session.registerBuzz(ana, later());
 
         session.evaluateAnswer(false);
 
@@ -111,45 +122,89 @@ class GameSessionTest {
         assertThat(session.getCurrentBuzzedPlayerId()).isEqualTo(ana);
         assertThat(session.getState()).isEqualTo(GameState.ANSWER_EVALUATION);
         assertThat(session.canBuzz(blue)).isFalse();
-        assertThat(session.registerBuzz(cas)).isFalse();
+        assertThat(session.registerBuzz(cas, later())).isFalse();
+    }
+
+    @Test
+    void buzzesAreOrderedByArrivalNotByWhoGotTheLockFirst() {
+        GameSession session = openClue();
+
+        session.registerBuzz(cas, OPENED.plusMillis(412));
+        session.registerBuzz(ana, OPENED.plusMillis(405)); // arrived first, waited behind Cas for the lock
+
+        assertThat(session.getBuzzes()).extracting(Buzz::playerId).containsExactly(ana, cas);
+        assertThat(session.getCurrentBuzzedPlayerId()).isEqualTo(ana);
+    }
+
+    @Test
+    void buzzReceivedBeforeTheBuzzersOpenedIsIgnored() {
+        GameSession session = openClue();
+
+        assertThat(session.registerBuzz(cas, OPENED.minusMillis(3))).isFalse();
+        assertThat(session.getState()).isEqualTo(GameState.BUZZER_OPEN);
+    }
+
+    @Test
+    void wrongAnswerKeepsTheBuzzForTheTimesButSkipsItInLine() {
+        GameSession session = openClue();
+        session.registerBuzz(cas, later());
+        session.registerBuzz(ana, later());
+
+        session.evaluateAnswer(false);
+
+        assertThat(session.getBuzzes()).extracting(Buzz::playerId).containsExactly(cas, ana);
+        assertThat(session.getCurrentBuzzedPlayerId()).isEqualTo(ana);
+    }
+
+    @Test
+    void hostCanEndTheGameEarly() {
+        GameSession session = openClue();
+        session.registerBuzz(cas, later());
+
+        session.endGame();
+
+        assertThat(session.getState()).isEqualTo(GameState.GAME_OVER);
+        assertThat(session.getActiveClueId()).isNull();
+        assertThat(session.getBuzzes()).isEmpty();
+        assertThatThrownBy(session::endGame).isInstanceOf(IllegalGameStateTransitionException.class);
     }
 
     @Test
     void wrongAnswerWithNobodyInLineReopensBuzzers() {
         GameSession session = openClue();
-        session.registerBuzz(cas);
+        session.registerBuzz(cas, later());
 
         session.evaluateAnswer(false);
 
         assertThat(session.getState()).isEqualTo(GameState.BUZZER_OPEN);
         assertThat(session.getCurrentBuzzedPlayerId()).isNull();
-        assertThat(session.registerBuzz(ben)).isTrue();
+        assertThat(session.registerBuzz(ben, later())).isTrue();
         assertThat(session.getCurrentBuzzedPlayerId()).isEqualTo(ben);
     }
 
     @Test
     void correctAnswerScoresAndTheNextClueStartsClean() {
         GameSession session = openClue();
-        session.registerBuzz(cas);
+        session.registerBuzz(cas, later());
         session.evaluateAnswer(false);
-        session.registerBuzz(ana);
+        session.registerBuzz(ana, later());
 
         session.evaluateAnswer(true);
 
         assertThat(score(session, red)).isEqualTo(100);
         assertThat(session.getActiveTeamId()).isEqualTo(red);
         assertThat(session.getState()).isEqualTo(GameState.BOARD_SELECTION);
-        assertThat(session.getBuzzQueue()).isEmpty();
+        assertThat(session.getBuzzes()).isEmpty();
 
         session.selectClue(second.getId());
-        session.openBuzzers();
+        session.openBuzzers(OPENED);
         assertThat(session.canBuzz(blue)).isTrue(); // lockout was for the previous clue only
     }
 
     @Test
     void closingAClueGivesNoPointsAndEndsTheGameAfterTheLastClue() {
         GameSession session = openClue();
-        session.registerBuzz(cas);
+        session.registerBuzz(cas, later());
         session.closeClue();
         assertThat(session.getState()).isEqualTo(GameState.BOARD_SELECTION);
         assertThat(score(session, blue)).isZero();

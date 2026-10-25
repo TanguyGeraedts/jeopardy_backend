@@ -1,6 +1,7 @@
 package dev.tanguy.game.jeopardy.gameplay.adapter.in.web.mapper;
 
 import dev.tanguy.game.jeopardy.common.domain.model.id.PlayerId;
+import dev.tanguy.game.jeopardy.common.domain.model.id.TeamId;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.GameSessionResponse;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.GameSessionResponse.BuzzSummary;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.GameSessionResponse.ClueSummary;
@@ -11,6 +12,8 @@ import dev.tanguy.game.jeopardy.gameplay.domain.model.GameSession;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.GameState;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.Player;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -55,10 +58,17 @@ public final class GameSessionResponseMapper {
                         p.teamId() != null ? p.teamId().value().toString() : null))
                 .toList();
 
-        List<BuzzSummary> buzzes = session.getBuzzQueue().stream()
-                .map(playerId -> new BuzzSummary(
-                        playerId.value().toString(),
-                        session.findPlayer(playerId).map(Player::teamId).map(id -> id.value().toString()).orElse(null)))
+        Instant openedAt = session.getBuzzersOpenedAt();
+        List<BuzzSummary> buzzes = session.getBuzzes().stream()
+                .map(buzz -> {
+                    TeamId teamId = session.findPlayer(buzz.playerId()).map(Player::teamId).orElse(null);
+                    boolean lockedOut = session.getTeams().stream().anyMatch(t -> t.getId().equals(teamId) && t.isLockedOut());
+                    return new BuzzSummary(
+                            buzz.playerId().value().toString(),
+                            teamId != null ? teamId.value().toString() : null,
+                            openedAt != null ? Duration.between(openedAt, buzz.at()).toMillis() : 0,
+                            lockedOut);
+                })
                 .toList();
 
         return new GameSessionResponse(

@@ -10,6 +10,7 @@ import dev.tanguy.game.jeopardy.gameplay.port.in.session.HostControlUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.function.Consumer;
 
 @Service
@@ -25,7 +26,9 @@ public class HostControlUseCaseImpl implements HostControlUseCase {
 
     @Override
     public GameSession openBuzzers(GameSessionId sessionId, OwnerId requesterId) {
-        return change(sessionId, requesterId, GameSession::openBuzzers);
+        // Same clock as the buzzes: taken before the lock, like theirs.
+        Instant openedAt = Instant.now();
+        return change(sessionId, requesterId, session -> session.openBuzzers(openedAt));
     }
 
     @Override
@@ -36,6 +39,11 @@ public class HostControlUseCaseImpl implements HostControlUseCase {
     @Override
     public GameSession closeClue(GameSessionId sessionId, OwnerId requesterId) {
         return change(sessionId, requesterId, GameSession::closeClue);
+    }
+
+    @Override
+    public GameSession endGame(GameSessionId sessionId, OwnerId requesterId) {
+        return change(sessionId, requesterId, GameSession::endGame);
     }
 
     @Override

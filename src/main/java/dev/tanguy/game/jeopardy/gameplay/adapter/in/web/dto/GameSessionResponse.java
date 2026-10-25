@@ -18,7 +18,7 @@ public record GameSessionResponse(
         String activeTeamId,
         /** Who is answering right now (first in the buzz queue). Null unless ANSWER_EVALUATION. */
         String answeringPlayerId,
-        /** Buzzes on the open clue, in arrival order. */
+        /** Buzzes on the open clue, in arrival order. Locked-out teams' buzzes stay in (lockedOut = true). */
         List<BuzzSummary> buzzes,
         List<ClueSummary> clues,
         List<TeamSummary> teams,
@@ -46,5 +46,11 @@ public record GameSessionResponse(
 
     public record PlayerSummary(String id, String name, String teamId) {}
 
-    public record BuzzSummary(String playerId, String teamId) {}
+    public record BuzzSummary(
+            String playerId, String teamId,
+            /** Milliseconds from the host opening the buzzers to the server receiving this buzz. Gaps = differences. */
+            long reactionMs,
+            /** The team answered wrongly: shown crossed out, no longer in line. */
+            boolean lockedOut
+    ) {}
 }

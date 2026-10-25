@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.BatchSize;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -50,13 +51,15 @@ public class GameSessionJpaEntity {
     @Column(name = "active_clue_id")
     private UUID activeClueId;
 
-    /** Player ids in buzz order for the open clue. */
+    @Column(name = "buzzers_opened_at")
+    private Instant buzzersOpenedAt;
+
+    /** Buzzes on the open clue, in arrival order. */
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "game_session_buzzes", joinColumns = @JoinColumn(name = "game_session_id"))
     @OrderColumn(name = "position")
-    @Column(name = "player_id", nullable = false)
     @Builder.Default
-    private List<UUID> buzzQueue = new ArrayList<>();
+    private List<BuzzEmbeddable> buzzes = new ArrayList<>();
 
     @OneToMany(mappedBy = "gameSession", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("sortOrder ASC")

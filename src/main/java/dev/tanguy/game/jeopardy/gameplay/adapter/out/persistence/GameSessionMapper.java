@@ -6,6 +6,7 @@ import dev.tanguy.game.jeopardy.common.domain.model.id.OwnerId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.PlayerId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.QuizId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.TeamId;
+import dev.tanguy.game.jeopardy.gameplay.domain.model.Buzz;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.ClueState;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.GameSession;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.Player;
@@ -33,7 +34,10 @@ public class GameSessionMapper {
                 .activeTeamId(session.getActiveTeamId() == null ? null : session.getActiveTeamId().value())
                 .currentBuzzedPlayerId(session.getCurrentBuzzedPlayerId() == null ? null : session.getCurrentBuzzedPlayerId().value())
                 .activeClueId(session.getActiveClueId() == null ? null : UUID.fromString(session.getActiveClueId().value()))
-                .buzzQueue(new ArrayList<>(session.getBuzzQueue().stream().map(PlayerId::value).toList()))
+                .buzzersOpenedAt(session.getBuzzersOpenedAt())
+                .buzzes(new ArrayList<>(session.getBuzzes().stream()
+                        .map(buzz -> new BuzzEmbeddable(buzz.playerId().value(), buzz.at()))
+                        .toList()))
                 .build();
 
         int position = 0;
@@ -93,7 +97,8 @@ public class GameSessionMapper {
                 entity.getActiveTeamId() == null ? null : new TeamId(entity.getActiveTeamId()),
                 entity.getCurrentBuzzedPlayerId() == null ? null : new PlayerId(entity.getCurrentBuzzedPlayerId()),
                 entity.getActiveClueId() == null ? null : new ClueId(entity.getActiveClueId().toString()),
-                entity.getBuzzQueue().stream().map(PlayerId::new).toList(),
+                entity.getBuzzersOpenedAt(),
+                entity.getBuzzes().stream().map(buzz -> new Buzz(new PlayerId(buzz.getPlayerId()), buzz.getBuzzedAt())).toList(),
                 clues,
                 teams,
                 players);

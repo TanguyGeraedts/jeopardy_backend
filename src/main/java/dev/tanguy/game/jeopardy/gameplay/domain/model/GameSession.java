@@ -26,6 +26,7 @@ import dev.tanguy.game.jeopardy.gameplay.domain.exception.session.LobbyCodeAlrea
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.team.TeamNotFoundException;
 import lombok.Getter;
 
+import java.time.Instant;
 import java.util.*;
 
 @Getter
@@ -51,8 +52,13 @@ public class GameSession {
     /** The player answering right now (head of the buzz queue). Null unless ANSWER_EVALUATION. */
     private PlayerId currentBuzzedPlayerId;
     private ClueId activeClueId;
-    /** Who buzzed on the open clue, in arrival order: at most one player per team. Locked-out teams are removed. */
-    private final List<PlayerId> buzzQueue = new ArrayList<>();
+    /** When the host opened the buzzers on the open clue. Null while it is being read (and on the board). */
+    private Instant buzzersOpenedAt;
+    /**
+     * Every buzz on the open clue, in arrival order: at most one player per team. Locked-out teams stay in the list
+     * (screens show them crossed out, and the gaps stay measured to the very first buzz); the queue skips them.
+     */
+    private final List<Buzz> buzzes = new ArrayList<>();
 
     /** Starts a brand new session. Emits GameSessionCreatedEvent. */
     public GameSession(GameSessionId id, OwnerId ownerId, QuizId quizId, List<ClueState> initialClues, GameMode mode) {
@@ -75,7 +81,7 @@ public class GameSession {
     public static GameSession restore(
             GameSessionId id, OwnerId ownerId, QuizId quizId, String lobbyCode, GameMode mode,
             GameState state, TeamId activeTeamId, PlayerId currentBuzzedPlayerId, ClueId activeClueId,
-            List<PlayerId> buzzQueue,
+            Instant buzzersOpenedAt, List<Buzz> buzzes,
             List<ClueState> clues, List<Team> teams, List<Player> players
     ) {
         GameSession session = new GameSession(id, ownerId, quizId, mode);
@@ -84,7 +90,8 @@ public class GameSession {
         session.activeTeamId = activeTeamId;
         session.currentBuzzedPlayerId = currentBuzzedPlayerId;
         session.activeClueId = activeClueId;
-        session.buzzQueue.addAll(buzzQueue);
+        session.buzzersOpenedAt = buzzersOpenedAt;
+        session.buzzes.addAll(buzzes);
         clues.forEach(clue -> session.clues.put(clue.getId(), clue));
         teams.forEach(team -> session.teams.put(team.getId(), team));
         players.forEach(player -> session.players.put(player.id(), player));
@@ -189,7 +196,8 @@ public class GameSession {
         clue.markAsRevealed();
         this.activeClueId = clueId;
         this.currentBuzzedPlayerId = null;
-        this.buzzQueue.clear();
+        this.buzzersOpenedAt = null;
+        this.buzzes.clear();
         teams.values().forEach(team -> team.setLockedOut(false));
         this.state = GameState.CLUE_READING;
 
@@ -197,11 +205,12 @@ public class GameSession {
         this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
     }
 
-    /** The host finished reading: buzzes count from now on. */
-    public void openBuzzers() {
+    /** The host finished reading: buzzes received from `at` on count. */
+    public void openBuzzers(Instant at) {
         if (state != GameState.CLUE_READING) {
             throw new IllegalGameStateTransitionException(state, "openBuzzers");
         }
+        this.buzzersOpenedAt = Objects.requireNonNull(at, "at cannot be null");
         this.state = GameState.BUZZER_OPEN;
         this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
     }
@@ -210,13 +219,18 @@ public class GameSession {
      * Records a buzz in arrival order. Buzzes keep queueing while someone answers, so the next team is up
      * right away after a wrong answer. Returns false (no error) when the buzz doesn't count: buzzers closed,
      * too early, team locked out, or the team already buzzed. Players mash the button; that's fine.
+     * `at` is when the server received the buzz: it decides the order, not who got the session lock first.
      */
-    public boolean registerBuzz(PlayerId playerId) {
+    public boolean registerBuzz(PlayerId playerId, Instant at) {
         Player player = players.get(playerId);
         if (player == null) {
             throw new PlayerNotFoundException(playerId);
         }
         if (state != GameState.BUZZER_OPEN && state != GameState.ANSWER_EVALUATION) {
+            return false;
+        }
+        // Received before the host opened them; it only waited for the lock behind openBuzzers.
+        if (buzzersOpenedAt != null && at.isBefore(buzzersOpenedAt)) {
             return false;
         }
 
@@ -225,15 +239,32 @@ public class GameSession {
             return false;
         }
 
-        buzzQueue.add(playerId);
+        int index = 0;
+        while (index < buzzes.size() && !buzzes.get(index).at().isAfter(at)) {
+            index++;
+        }
+        buzzes.add(index, new Buzz(playerId, at));
         this.domainEvents.add(new BuzzerPressedEvent(this.id, playerId));
 
+        // Usually unchanged; differs only when this buzz arrived a few ms before the one that got the lock first.
+        this.currentBuzzedPlayerId = firstInLine();
         if (state == GameState.BUZZER_OPEN) {
-            this.currentBuzzedPlayerId = playerId;
             this.state = GameState.ANSWER_EVALUATION;
             this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
         }
         return true;
+    }
+
+    /** The earliest buzz from a team that isn't locked out, or null. */
+    private PlayerId firstInLine() {
+        return buzzes.stream()
+                .map(Buzz::playerId)
+                .filter(playerId -> {
+                    Team team = teams.get(teamOf(playerId));
+                    return team != null && !team.isLockedOut();
+                })
+                .findFirst()
+                .orElse(null);
     }
 
     /** Whether a buzz from this team would count now (ignoring the game state). */
@@ -242,7 +273,7 @@ public class GameSession {
         if (team == null || team.isLockedOut()) {
             return false;
         }
-        return buzzQueue.stream().noneMatch(queued -> teamId.equals(teamOf(queued)));
+        return buzzes.stream().noneMatch(buzz -> teamId.equals(teamOf(buzz.playerId())));
     }
 
     /**
@@ -274,8 +305,7 @@ public class GameSession {
         } else {
             team.subtractScore(clue.getValue());
             team.setLockedOut(true);
-            buzzQueue.remove(answeringPlayerId);
-            this.currentBuzzedPlayerId = buzzQueue.isEmpty() ? null : buzzQueue.getFirst();
+            this.currentBuzzedPlayerId = firstInLine();
             this.state = currentBuzzedPlayerId == null ? GameState.BUZZER_OPEN : GameState.ANSWER_EVALUATION;
         }
 
@@ -289,6 +319,16 @@ public class GameSession {
             throw new IllegalGameStateTransitionException(state, "closeClue");
         }
         resetToBoardSelection();
+        this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
+    }
+
+    /** The host stops early (e.g. out of time): the final scores are what they are now. Unplayed clues stay unplayed. */
+    public void endGame() {
+        if (state == GameState.LOBBY || state == GameState.GAME_OVER) {
+            throw new IllegalGameStateTransitionException(state, "endGame");
+        }
+        clearOpenClue();
+        this.state = GameState.GAME_OVER;
         this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
     }
 
@@ -325,11 +365,7 @@ public class GameSession {
     }
 
     private void resetToBoardSelection() {
-        this.activeClueId = null;
-        this.currentBuzzedPlayerId = null;
-        this.buzzQueue.clear();
-        teams.values().forEach(team -> team.setLockedOut(false));
-
+        clearOpenClue();
         boolean allRevealed = clues.values().stream().allMatch(ClueState::isRevealed);
         this.state = allRevealed ? GameState.GAME_OVER : GameState.BOARD_SELECTION;
     }
@@ -340,7 +376,15 @@ public class GameSession {
         return copy;
     }
 
-    public List<PlayerId> getBuzzQueue() { return Collections.unmodifiableList(buzzQueue); }
+    private void clearOpenClue() {
+        this.activeClueId = null;
+        this.currentBuzzedPlayerId = null;
+        this.buzzersOpenedAt = null;
+        this.buzzes.clear();
+        teams.values().forEach(team -> team.setLockedOut(false));
+    }
+
+    public List<Buzz> getBuzzes() { return Collections.unmodifiableList(buzzes); }
     public Collection<Player> getPlayers() { return Collections.unmodifiableCollection(players.values()); }
     public Collection<Team> getTeams() { return Collections.unmodifiableCollection(teams.values()); }
 }
