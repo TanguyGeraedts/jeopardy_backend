@@ -28,9 +28,11 @@ app:
     base-url: http://localhost:3100
     launch-url: http://localhost:3000/play/{gameSessionId}
     public-key-location: file:./secrets/lobby-public.pem
+    game-name: ${LOBBY_GAME_NAME:Jeopardy}
+    game-banner: ${LOBBY_GAME_BANNER:https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSfg_368UuXqIhyTUzBLq3h9ijRTR8MXn6gYn06dVssSUMHWxsoy6t_G1ZS&s=10}
+    background-color: ${LOBBY_BACKGROUND_COLOR:#0F172A}
+    background-image: ${LOBBY_BACKGROUND_IMAGE:https://assets-prd.ignimgs.com/2022/07/15/jeopardy-1657926877160.png}
   security:
-    # Host logins: your Clerk DEVELOPMENT instance (keys pk_test_/sk_test_). Not a secret: it's the public
-    # Frontend API URL from the Clerk dashboard (Configure > API keys). Production overrides it (application-prod.yaml).
     clerk:
       issuer: ${CLERK_ISSUER:https://adjusted-cicada-6273.clerk.accounts.dev}
       authorized-parties: ${CLERK_AUTHORIZED_PARTIES:http://localhost:3000}

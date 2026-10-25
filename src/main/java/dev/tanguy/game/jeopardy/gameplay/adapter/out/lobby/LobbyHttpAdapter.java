@@ -43,9 +43,9 @@ public class LobbyHttpAdapter implements LobbyPort {
         LobbyConfigBody body = new LobbyConfigBody(
                 new GameInfoBody(
                         properties.gameName(),
-                        null,
+                        blankToNull(properties.gameBanner()),
                         properties.backgroundColor(),
-                        null,
+                        blankToNull(properties.backgroundImage()),
                         properties.launchUrl().replace("{gameSessionId}", sessionId),
                         "REDIRECT",
                         true),
@@ -74,6 +74,11 @@ public class LobbyHttpAdapter implements LobbyPort {
             log.warn("Creating lobby for game session {} failed: {}", sessionId, e.getMessage());
             throw new ExternalServiceException("The lobby service is currently unavailable.", e);
         }
+    }
+
+    /** An empty yaml value ("background-image:") means "none": the lobby expects null, not "". */
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.strip();
     }
 
     @Override

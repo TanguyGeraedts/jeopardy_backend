@@ -20,8 +20,13 @@ public record LobbyProperties(
         @DefaultValue("game-server") String handoffAudience,
         /** Audience of the per-player game tokens the lobby hands each player (used to buzz). */
         @DefaultValue("game-player") String playerAudience,
+        // ---- How the lobby page looks (sent with every new lobby; set in application.yaml) ----
         @DefaultValue("Jeopardy") String gameName,
+        /** Optional image URL shown instead of gameName at the top of the lobby. Blank = the name as text. */
+        String gameBanner,
         @DefaultValue("#0F172A") String backgroundColor,
+        /** Optional image URL behind the lobby (cover, darkened). Blank = backgroundColor only. */
+        String backgroundImage,
         /** Players needed in the lobby before its host (the first player to join) can start the game. */
         @DefaultValue("1") int minPlayers,
         @DefaultValue("true") boolean balancedTeams,
