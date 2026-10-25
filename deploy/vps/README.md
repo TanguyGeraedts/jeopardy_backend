@@ -16,6 +16,7 @@ and runs `deploy-jeopardy` on the VPS, which pulls both images and restarts what
 
 Do these in order. Steps 1-4 happen outside the VPS.
 
+
 ### 1. DNS
 
 Add an `A` record (and `AAAA` if the VPS has IPv6) for `jeopardy.geraedts.dev` pointing at the VPS. Wait until
