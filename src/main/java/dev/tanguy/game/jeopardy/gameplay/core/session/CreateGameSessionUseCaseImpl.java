@@ -37,6 +37,7 @@ public class CreateGameSessionUseCaseImpl implements CreateGameSessionUseCase {
                 command.quizId(),
                 clues,
                 command.mode());
+        session.changeTurnRules(command.turnRules());
 
         // Network call first, outside any DB transaction. If the lobby is down nothing is saved.
         LobbyInfo lobby = lobbyPort.createLobby(new CreateLobbyRequest(

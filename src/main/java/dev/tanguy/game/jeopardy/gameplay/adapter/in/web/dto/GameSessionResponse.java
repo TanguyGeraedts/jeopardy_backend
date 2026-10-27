@@ -20,6 +20,20 @@ public record GameSessionResponse(
         String answeringPlayerId,
         /** Buzzes on the open clue, in arrival order. Locked-out teams' buzzes stay in (lockedOut = true). */
         List<BuzzSummary> buzzes,
+        /** Taking turns: each clue one team gets a head start to buzz, then anyone may steal. */
+        boolean turnsEnabled,
+        int headStartSeconds,
+        /** Whose turn it is (gets the head start on the next clue). Null without turns. */
+        String turnTeamId,
+        /** The team with the head start on the open clue. Null without turns or when no clue is open. */
+        String clueTurnTeamId,
+        /**
+         * Ms from when this was sent until the buzzers open (without turns they open after a random delay). 0 = open,
+         * null = not opened yet (the clue is still being read) or no clue open. Screens count down from receipt.
+         */
+        Long buzzersOpenInMs,
+        /** Ms until anyone may steal (end of the turn team's head start). 0 = open to all, null = no head start. */
+        Long stealOpensInMs,
         List<ClueSummary> clues,
         List<TeamSummary> teams,
         List<PlayerSummary> players

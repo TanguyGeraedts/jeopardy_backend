@@ -26,6 +26,7 @@ import dev.tanguy.game.jeopardy.gameplay.domain.exception.session.LobbyCodeAlrea
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.team.TeamNotFoundException;
 import lombok.Getter;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
@@ -39,7 +40,8 @@ public class GameSession {
     private final QuizId quizId;
     private final GameMode mode;
     private final Map<PlayerId, Player> players = new HashMap<>();
-    private final Map<TeamId, Team> teams = new HashMap<>();
+    /** Insertion order = the lobby's team order: the scoreboard and the turn rotation follow it. */
+    private final Map<TeamId, Team> teams = new LinkedHashMap<>();
     /** Insertion order = board order (category by category, lowest points first). */
     private final Map<ClueId, ClueState> clues = new LinkedHashMap<>();
     private final List<DomainEvent> domainEvents = new ArrayList<>();
@@ -59,6 +61,15 @@ public class GameSession {
      * (screens show them crossed out, and the gaps stay measured to the very first buzz); the queue skips them.
      */
     private final List<Buzz> buzzes = new ArrayList<>();
+
+    private TurnRules turnRules = TurnRules.OFF;
+    /** Whose turn it is: that team gets the head start on the next clue. Null while turns were never on. */
+    private TeamId turnTeamId;
+    /**
+     * The team with the head start on the open clue: fixed when the clue is picked (the host can still move it while
+     * the clue is read). Null without turns. If the host moves the turn after that, it's for the next clue.
+     */
+    private TeamId clueTurnTeamId;
 
     /** Starts a brand new session. Emits GameSessionCreatedEvent. */
     public GameSession(GameSessionId id, OwnerId ownerId, QuizId quizId, List<ClueState> initialClues, GameMode mode) {
@@ -82,6 +93,7 @@ public class GameSession {
             GameSessionId id, OwnerId ownerId, QuizId quizId, String lobbyCode, GameMode mode,
             GameState state, TeamId activeTeamId, PlayerId currentBuzzedPlayerId, ClueId activeClueId,
             Instant buzzersOpenedAt, List<Buzz> buzzes,
+            TurnRules turnRules, TeamId turnTeamId, TeamId clueTurnTeamId,
             List<ClueState> clues, List<Team> teams, List<Player> players
     ) {
         GameSession session = new GameSession(id, ownerId, quizId, mode);
@@ -92,6 +104,9 @@ public class GameSession {
         session.activeClueId = activeClueId;
         session.buzzersOpenedAt = buzzersOpenedAt;
         session.buzzes.addAll(buzzes);
+        session.turnRules = turnRules;
+        session.turnTeamId = turnTeamId;
+        session.clueTurnTeamId = clueTurnTeamId;
         clues.forEach(clue -> session.clues.put(clue.getId(), clue));
         teams.forEach(team -> session.teams.put(team.getId(), team));
         players.forEach(player -> session.players.put(player.id(), player));
@@ -174,9 +189,67 @@ public class GameSession {
             throw new DomainConflictException("Cannot start game without players and teams") {};
         }
         this.activeTeamId = teams.keySet().iterator().next();
+        if (turnRules.enabled()) {
+            this.turnTeamId = activeTeamId;
+        }
         this.state = GameState.BOARD_SELECTION;
 
         this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
+    }
+
+    // ---------- turns ----------
+
+    /** Set when the game is created; the host can change it any time. Switching on starts with the first team. */
+    public void changeTurnRules(TurnRules rules) {
+        this.turnRules = Objects.requireNonNull(rules, "rules cannot be null");
+        if (rules.enabled() && turnTeamId == null && state != GameState.LOBBY && !teams.isEmpty()) {
+            this.turnTeamId = teams.keySet().iterator().next();
+        }
+    }
+
+    /**
+     * The host hands the turn to a team (e.g. one that's far behind); the rotation continues from there.
+     * Before the buzzers open it counts for the clue being read; after that, from the next clue.
+     */
+    public void giveTurn(TeamId teamId) {
+        requireTeam(teamId);
+        this.turnTeamId = teamId;
+        if (state == GameState.CLUE_READING && turnRules.enabled()) {
+            this.clueTurnTeamId = teamId;
+        }
+    }
+
+    /** The turn goes to the next team in the rotation. */
+    public void skipTurn() {
+        if (teams.isEmpty()) {
+            return;
+        }
+        giveTurn(teamAfter(turnTeamId));
+    }
+
+    /** The next team in lobby order, wrapping around. Null or unknown = the first team. */
+    private TeamId teamAfter(TeamId current) {
+        List<TeamId> order = new ArrayList<>(teams.keySet());
+        int index = current == null ? -1 : order.indexOf(current);
+        return order.get((index + 1) % order.size());
+    }
+
+    /** When anyone may buzz on the open clue: the end of the turn team's head start. Null = no head start. */
+    public Instant stealOpensAt() {
+        if (clueTurnTeamId == null || buzzersOpenedAt == null || isOpenClueDailyDouble()) {
+            return null;
+        }
+        // The turn team answered wrongly: no need to wait out the rest of its head start.
+        Team turnTeam = teams.get(clueTurnTeamId);
+        if (turnTeam != null && turnTeam.isLockedOut()) {
+            return buzzersOpenedAt;
+        }
+        return buzzersOpenedAt.plusSeconds(turnRules.headStartSeconds());
+    }
+
+    private boolean isOpenClueDailyDouble() {
+        ClueState clue = activeClueId == null ? null : clues.get(activeClueId);
+        return clue != null && clue.isDailyDouble();
     }
 
     /** The host opens a clue. Buzzers stay closed while it is being read (CLUE_READING). */
@@ -199,44 +272,56 @@ public class GameSession {
         this.buzzersOpenedAt = null;
         this.buzzes.clear();
         teams.values().forEach(team -> team.setLockedOut(false));
+        this.clueTurnTeamId = turnRules.enabled() ? turnTeamId : null;
         this.state = GameState.CLUE_READING;
 
         this.domainEvents.add(new ClueSelectedEvent(this.id, clueId));
         this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
     }
 
-    /** The host finished reading: buzzes received from `at` on count. */
-    public void openBuzzers(Instant at) {
+    /**
+     * The host finished reading. With turns, the turn team may buzz from `at` and everyone else after its head start.
+     * Without turns, the buzzers open `randomDelay` later, so nobody can time a buzz off the host's click.
+     */
+    public void openBuzzers(Instant at, Duration randomDelay) {
         if (state != GameState.CLUE_READING) {
             throw new IllegalGameStateTransitionException(state, "openBuzzers");
         }
-        this.buzzersOpenedAt = Objects.requireNonNull(at, "at cannot be null");
+        Objects.requireNonNull(at, "at cannot be null");
+        this.buzzersOpenedAt = clueTurnTeamId != null ? at : at.plus(randomDelay);
         this.state = GameState.BUZZER_OPEN;
         this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
     }
 
     /**
      * Records a buzz in arrival order. Buzzes keep queueing while someone answers, so the next team is up
-     * right away after a wrong answer. Returns false (no error) when the buzz doesn't count: buzzers closed,
-     * too early, team locked out, or the team already buzzed. Players mash the button; that's fine.
-     * `at` is when the server received the buzz: it decides the order, not who got the session lock first.
+     * right away after a wrong answer. `at` is when the server received the buzz: it decides the order, not who got
+     * the session lock first.
+     * TOO_EARLY: the clue is still being read, the buzzers haven't opened yet, or it's another team's head start
+     * (the caller locks the player out for a moment, so mashing doesn't pay). IGNORED: it doesn't count, no penalty.
      */
-    public boolean registerBuzz(PlayerId playerId, Instant at) {
+    public BuzzOutcome registerBuzz(PlayerId playerId, Instant at) {
         Player player = players.get(playerId);
         if (player == null) {
             throw new PlayerNotFoundException(playerId);
         }
-        if (state != GameState.BUZZER_OPEN && state != GameState.ANSWER_EVALUATION) {
-            return false;
+        if (state == GameState.CLUE_READING) {
+            return BuzzOutcome.TOO_EARLY;
         }
-        // Received before the host opened them; it only waited for the lock behind openBuzzers.
+        if (state != GameState.BUZZER_OPEN && state != GameState.ANSWER_EVALUATION) {
+            return BuzzOutcome.IGNORED;
+        }
         if (buzzersOpenedAt != null && at.isBefore(buzzersOpenedAt)) {
-            return false;
+            return BuzzOutcome.TOO_EARLY;
         }
 
         TeamId teamId = player.getTeamId().orElseThrow(() -> new TeamNotFoundException(null));
-        if (!canBuzz(teamId)) {
-            return false;
+        if (!canBuzzOnOpenClue(teamId)) {
+            return BuzzOutcome.IGNORED;
+        }
+        Instant stealAt = stealOpensAt();
+        if (stealAt != null && !teamId.equals(clueTurnTeamId) && at.isBefore(stealAt)) {
+            return BuzzOutcome.TOO_EARLY;
         }
 
         int index = 0;
@@ -252,7 +337,7 @@ public class GameSession {
             this.state = GameState.ANSWER_EVALUATION;
             this.domainEvents.add(new GameStateChangedEvent(this.id, this.state));
         }
-        return true;
+        return BuzzOutcome.ACCEPTED;
     }
 
     /** The earliest buzz from a team that isn't locked out, or null. */
@@ -274,6 +359,14 @@ public class GameSession {
             return false;
         }
         return buzzes.stream().noneMatch(buzz -> teamId.equals(teamOf(buzz.playerId())));
+    }
+
+    /** canBuzz, plus: with turns on, a daily double belongs to the turn team only (no stealing). Ignores the clock. */
+    public boolean canBuzzOnOpenClue(TeamId teamId) {
+        if (!canBuzz(teamId)) {
+            return false;
+        }
+        return clueTurnTeamId == null || !isOpenClueDailyDouble() || clueTurnTeamId.equals(teamId);
     }
 
     /**
@@ -365,6 +458,11 @@ public class GameSession {
     }
 
     private void resetToBoardSelection() {
+        // Turns rotate after every clue, whatever happened. Unless the host moved the turn during the clue:
+        // then that team is up next.
+        if (turnRules.enabled() && clueTurnTeamId != null && clueTurnTeamId.equals(turnTeamId)) {
+            this.turnTeamId = teamAfter(turnTeamId);
+        }
         clearOpenClue();
         boolean allRevealed = clues.values().stream().allMatch(ClueState::isRevealed);
         this.state = allRevealed ? GameState.GAME_OVER : GameState.BOARD_SELECTION;
@@ -380,6 +478,7 @@ public class GameSession {
         this.activeClueId = null;
         this.currentBuzzedPlayerId = null;
         this.buzzersOpenedAt = null;
+        this.clueTurnTeamId = null;
         this.buzzes.clear();
         teams.values().forEach(team -> team.setLockedOut(false));
     }

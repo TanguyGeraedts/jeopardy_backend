@@ -12,6 +12,7 @@ import dev.tanguy.game.jeopardy.gameplay.domain.exception.session.IllegalGameSta
 import dev.tanguy.game.jeopardy.gameplay.domain.exception.team.TeamNotFoundException;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
@@ -66,7 +67,7 @@ class GameSessionTest {
         session.addPlayer(cas, "Cas", blue);
         session.startGame();
         session.selectClue(first.getId());
-        session.openBuzzers(OPENED);
+        session.openBuzzers(OPENED, Duration.ZERO);
         return session;
     }
 
@@ -91,7 +92,7 @@ class GameSessionTest {
         session.startGame();
         session.selectClue(first.getId());
 
-        assertThat(session.registerBuzz(ana, later())).isFalse();
+        assertThat(session.registerBuzz(ana, later())).isEqualTo(BuzzOutcome.TOO_EARLY);
         assertThat(session.getState()).isEqualTo(GameState.CLUE_READING);
         assertThat(session.getBuzzes()).isEmpty();
     }
@@ -100,10 +101,10 @@ class GameSessionTest {
     void firstBuzzAnswersAndLaterBuzzesQueueOnePerTeam() {
         GameSession session = openClue();
 
-        assertThat(session.registerBuzz(cas, later())).isTrue();
-        assertThat(session.registerBuzz(ana, later())).isTrue();
-        assertThat(session.registerBuzz(ben, later())).isFalse(); // red already in line
-        assertThat(session.registerBuzz(cas, later())).isFalse(); // mashing
+        assertThat(session.registerBuzz(cas, later())).isEqualTo(BuzzOutcome.ACCEPTED);
+        assertThat(session.registerBuzz(ana, later())).isEqualTo(BuzzOutcome.ACCEPTED);
+        assertThat(session.registerBuzz(ben, later())).isEqualTo(BuzzOutcome.IGNORED); // red already in line
+        assertThat(session.registerBuzz(cas, later())).isEqualTo(BuzzOutcome.IGNORED); // mashing
 
         assertThat(session.getState()).isEqualTo(GameState.ANSWER_EVALUATION);
         assertThat(session.getCurrentBuzzedPlayerId()).isEqualTo(cas);
@@ -122,7 +123,7 @@ class GameSessionTest {
         assertThat(session.getCurrentBuzzedPlayerId()).isEqualTo(ana);
         assertThat(session.getState()).isEqualTo(GameState.ANSWER_EVALUATION);
         assertThat(session.canBuzz(blue)).isFalse();
-        assertThat(session.registerBuzz(cas, later())).isFalse();
+        assertThat(session.registerBuzz(cas, later())).isEqualTo(BuzzOutcome.IGNORED);
     }
 
     @Test
@@ -140,7 +141,7 @@ class GameSessionTest {
     void buzzReceivedBeforeTheBuzzersOpenedIsIgnored() {
         GameSession session = openClue();
 
-        assertThat(session.registerBuzz(cas, OPENED.minusMillis(3))).isFalse();
+        assertThat(session.registerBuzz(cas, OPENED.minusMillis(3))).isEqualTo(BuzzOutcome.TOO_EARLY);
         assertThat(session.getState()).isEqualTo(GameState.BUZZER_OPEN);
     }
 
@@ -178,7 +179,7 @@ class GameSessionTest {
 
         assertThat(session.getState()).isEqualTo(GameState.BUZZER_OPEN);
         assertThat(session.getCurrentBuzzedPlayerId()).isNull();
-        assertThat(session.registerBuzz(ben, later())).isTrue();
+        assertThat(session.registerBuzz(ben, later())).isEqualTo(BuzzOutcome.ACCEPTED);
         assertThat(session.getCurrentBuzzedPlayerId()).isEqualTo(ben);
     }
 
@@ -197,7 +198,7 @@ class GameSessionTest {
         assertThat(session.getBuzzes()).isEmpty();
 
         session.selectClue(second.getId());
-        session.openBuzzers(OPENED);
+        session.openBuzzers(OPENED, Duration.ZERO);
         assertThat(session.canBuzz(blue)).isTrue(); // lockout was for the previous clue only
     }
 
@@ -240,5 +241,119 @@ class GameSessionTest {
 
         assertThat(score(session, red)).isEqualTo(400);
         assertThat(score(session, blue)).isEqualTo(42);
+    }
+
+    // ---------- turns and the buzzer opening ----------
+
+    @Test
+    void withoutTurnsTheBuzzersOpenAfterTheRandomDelay() {
+        GameSession session = new GameSession(
+                GameSessionId.generate(), OwnerId.generate(), QuizId.generate(), List.of(first), GameMode.TEAM);
+        session.createTeam(red, "Red");
+        session.addPlayer(ana, "Ana", red);
+        session.startGame();
+        session.selectClue(first.getId());
+
+        session.openBuzzers(OPENED, Duration.ofMillis(1500));
+
+        assertThat(session.getBuzzersOpenedAt()).isEqualTo(OPENED.plusMillis(1500));
+        assertThat(session.registerBuzz(ana, OPENED.plusMillis(1000))).isEqualTo(BuzzOutcome.TOO_EARLY);
+        assertThat(session.registerBuzz(ana, OPENED.plusMillis(1600))).isEqualTo(BuzzOutcome.ACCEPTED);
+    }
+
+    private final ClueState dailyDouble = new ClueState(ClueId.generate(), "GEO", 300, "Q300", "A300", true);
+
+    /** Red (Ana, Ben) and Blue (Cas), taking turns with a 7 s head start, game started: Red's turn. */
+    private GameSession turnsGame() {
+        GameSession session = new GameSession(
+                GameSessionId.generate(), OwnerId.generate(), QuizId.generate(), List.of(first, second, dailyDouble), GameMode.TEAM);
+        session.changeTurnRules(new TurnRules(true, 7));
+        session.createTeam(red, "Red");
+        session.createTeam(blue, "Blue");
+        session.addPlayer(ana, "Ana", red);
+        session.addPlayer(ben, "Ben", red);
+        session.addPlayer(cas, "Cas", blue);
+        session.startGame();
+        return session;
+    }
+
+    @Test
+    void theTurnTeamGetsAHeadStartThenOthersCanSteal() {
+        GameSession session = turnsGame();
+        session.selectClue(first.getId());
+        session.openBuzzers(OPENED, Duration.ofSeconds(2)); // the random delay is not used with turns
+
+        assertThat(session.getClueTurnTeamId()).isEqualTo(red);
+        assertThat(session.stealOpensAt()).isEqualTo(OPENED.plusSeconds(7));
+        assertThat(session.registerBuzz(cas, OPENED.plusSeconds(2))).isEqualTo(BuzzOutcome.TOO_EARLY);
+        assertThat(session.registerBuzz(ana, OPENED.plusSeconds(3))).isEqualTo(BuzzOutcome.ACCEPTED);
+        assertThat(session.registerBuzz(cas, OPENED.plusSeconds(5))).isEqualTo(BuzzOutcome.TOO_EARLY); // still Red's head start
+        assertThat(session.registerBuzz(cas, OPENED.plusSeconds(8))).isEqualTo(BuzzOutcome.ACCEPTED); // in line to steal
+        assertThat(session.getCurrentBuzzedPlayerId()).isEqualTo(ana);
+    }
+
+    @Test
+    void aWrongAnswerFromTheTurnTeamOpensTheStealAtOnce() {
+        GameSession session = turnsGame();
+        session.selectClue(first.getId());
+        session.openBuzzers(OPENED, Duration.ZERO);
+        session.registerBuzz(ana, OPENED.plusSeconds(1));
+
+        session.evaluateAnswer(false);
+
+        assertThat(session.registerBuzz(cas, OPENED.plusSeconds(2))).isEqualTo(BuzzOutcome.ACCEPTED);
+    }
+
+    @Test
+    void turnsRotateAfterEveryClue() {
+        GameSession session = turnsGame();
+        assertThat(session.getTurnTeamId()).isEqualTo(red);
+
+        session.selectClue(first.getId());
+        session.closeClue();
+        assertThat(session.getTurnTeamId()).isEqualTo(blue);
+
+        session.selectClue(second.getId());
+        assertThat(session.getClueTurnTeamId()).isEqualTo(blue);
+        session.closeClue();
+        assertThat(session.getTurnTeamId()).isEqualTo(red);
+    }
+
+    @Test
+    void hostMovesTheTurn_beforeTheBuzzersOpenForThisClue_afterwardsForTheNext() {
+        GameSession session = turnsGame();
+
+        session.selectClue(first.getId());
+        session.giveTurn(blue); // still being read: Blue gets this clue
+        assertThat(session.getClueTurnTeamId()).isEqualTo(blue);
+        session.closeClue();
+        assertThat(session.getTurnTeamId()).isEqualTo(red); // rotation continues from Blue
+
+        session.selectClue(second.getId());
+        session.openBuzzers(OPENED, Duration.ZERO);
+        session.skipTurn(); // buzzers open: Red keeps this clue, Blue is up next
+        assertThat(session.getClueTurnTeamId()).isEqualTo(red);
+        session.closeClue();
+        assertThat(session.getTurnTeamId()).isEqualTo(blue);
+    }
+
+    @Test
+    void aDailyDoubleWithTurnsIsTheTurnTeamsAlone() {
+        GameSession session = turnsGame();
+        session.selectClue(dailyDouble.getId());
+        session.openBuzzers(OPENED, Duration.ZERO);
+
+        assertThat(session.stealOpensAt()).isNull();
+        assertThat(session.canBuzzOnOpenClue(blue)).isFalse();
+        assertThat(session.registerBuzz(cas, OPENED.plusSeconds(30))).isEqualTo(BuzzOutcome.IGNORED);
+        assertThat(session.registerBuzz(ana, OPENED.plusSeconds(1))).isEqualTo(BuzzOutcome.ACCEPTED);
+    }
+
+    @Test
+    void pressingWhileTheClueIsReadIsTooEarly() {
+        GameSession session = turnsGame();
+        session.selectClue(first.getId());
+
+        assertThat(session.registerBuzz(ana, OPENED)).isEqualTo(BuzzOutcome.TOO_EARLY);
     }
 }

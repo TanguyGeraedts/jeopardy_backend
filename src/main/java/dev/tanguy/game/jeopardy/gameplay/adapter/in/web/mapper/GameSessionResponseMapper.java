@@ -48,7 +48,8 @@ public final class GameSessionResponseMapper {
                         t.getMemberIds().stream().map(id -> id.value().toString()).toList(),
                         t.isLockedOut(),
                         t.getBuzzerSound() != null ? t.getBuzzerSound().name() : null,
-                        buzzing && session.canBuzz(t.getId())))
+                        // Ignores the clock: screens combine it with buzzersOpenInMs / stealOpensInMs.
+                        buzzing && session.canBuzzOnOpenClue(t.getId())))
                 .toList();
 
         List<PlayerSummary> players = session.getPlayers().stream()
@@ -80,7 +81,22 @@ public final class GameSessionResponseMapper {
                 session.getActiveTeamId() != null ? session.getActiveTeamId().value().toString() : null,
                 idOf(session.getCurrentBuzzedPlayerId()),
                 buzzes,
+                session.getTurnRules().enabled(),
+                session.getTurnRules().headStartSeconds(),
+                session.getTurnRules().enabled() ? teamIdOf(session.getTurnTeamId()) : null,
+                teamIdOf(session.getClueTurnTeamId()),
+                buzzing ? msUntil(openedAt) : null,
+                buzzing ? msUntil(session.stealOpensAt()) : null,
                 clues, teams, players);
+    }
+
+    /** Ms from now until `at`, 0 once it's passed, null without a moment. Sent relative: phones' clocks don't matter. */
+    private static Long msUntil(Instant at) {
+        return at == null ? null : Math.max(0, Duration.between(Instant.now(), at).toMillis());
+    }
+
+    private static String teamIdOf(TeamId teamId) {
+        return teamId == null ? null : teamId.value().toString();
     }
 
     private static String idOf(PlayerId playerId) {

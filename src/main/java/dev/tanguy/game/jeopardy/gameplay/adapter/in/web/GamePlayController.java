@@ -8,6 +8,9 @@ import dev.tanguy.game.jeopardy.common.infrastructure.security.CurrentUser;
 import dev.tanguy.game.jeopardy.common.web.ApiPaths;
 import dev.tanguy.game.jeopardy.common.web.ApiResponse;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.BuzzResponse;
+import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.TurnRulesRequest;
+import dev.tanguy.game.jeopardy.gameplay.core.session.BuzzerLockouts;
+import dev.tanguy.game.jeopardy.gameplay.domain.model.BuzzOutcome;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.BuzzerSoundRequest;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.ChangeScoreRequest;
 import dev.tanguy.game.jeopardy.gameplay.adapter.in.web.dto.GameSessionResponse;
@@ -73,8 +76,15 @@ public class GamePlayController {
             @PathVariable UUID id,
             @RequestHeader(name = PLAYER_TOKEN_HEADER, required = false) String playerToken
     ) {
-        boolean accepted = buzzUseCase.buzz(new BuzzCommand(new GameSessionId(id), playerToken));
-        return ResponseEntity.ok(ApiResponse.success(new BuzzResponse(accepted), accepted ? "Buzzed in" : "Buzz ignored"));
+        BuzzOutcome outcome = buzzUseCase.buzz(new BuzzCommand(new GameSessionId(id), playerToken));
+        long lockedOutMs = outcome == BuzzOutcome.TOO_EARLY ? BuzzerLockouts.LOCKOUT.toMillis() : 0;
+        String message = switch (outcome) {
+            case ACCEPTED -> "Buzzed in";
+            case TOO_EARLY -> "Too early";
+            case IGNORED -> "Buzz ignored";
+        };
+        return ResponseEntity.ok(ApiResponse.success(
+                new BuzzResponse(outcome == BuzzOutcome.ACCEPTED, outcome.name(), lockedOutMs), message));
     }
 
     // ---------- host (session owner) ----------
@@ -98,6 +108,22 @@ public class GamePlayController {
     @PostMapping(ApiPaths.Gameplay.CLOSE_CLUE)
     public ResponseEntity<ApiResponse<GameSessionResponse>> closeClue(@PathVariable UUID id) {
         return ok(hostControlUseCase.closeClue(sessionId(id), owner()));
+    }
+
+    @PutMapping(ApiPaths.Gameplay.TURN_RULES)
+    public ResponseEntity<ApiResponse<GameSessionResponse>> changeTurnRules(
+            @PathVariable UUID id, @Valid @RequestBody TurnRulesRequest request) {
+        return ok(hostControlUseCase.changeTurnRules(sessionId(id), owner(), request.toRules()));
+    }
+
+    @PostMapping(ApiPaths.Gameplay.GIVE_TURN)
+    public ResponseEntity<ApiResponse<GameSessionResponse>> giveTurn(@PathVariable UUID id, @PathVariable UUID teamId) {
+        return ok(hostControlUseCase.giveTurn(sessionId(id), owner(), new TeamId(teamId)));
+    }
+
+    @PostMapping(ApiPaths.Gameplay.SKIP_TURN)
+    public ResponseEntity<ApiResponse<GameSessionResponse>> skipTurn(@PathVariable UUID id) {
+        return ok(hostControlUseCase.skipTurn(sessionId(id), owner()));
     }
 
     @PostMapping(ApiPaths.Gameplay.END_GAME)

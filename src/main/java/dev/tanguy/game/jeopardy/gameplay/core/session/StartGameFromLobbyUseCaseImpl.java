@@ -53,6 +53,15 @@ public class StartGameFromLobbyUseCaseImpl implements StartGameFromLobbyUseCase 
         Map<Integer, LobbyHandoff.Team> lobbyTeams = new HashMap<>();
         handoff.teams().forEach(team -> lobbyTeams.put(team.teamId(), team));
 
+        // Teams first, in the lobby's order (it sets the scoreboard and the turn rotation). Empty teams are skipped.
+        for (LobbyHandoff.Team lobbyTeam : handoff.teams()) {
+            boolean hasPlayers = handoff.players().stream().anyMatch(p -> Integer.valueOf(lobbyTeam.teamId()).equals(p.teamId()));
+            String externalTeamId = String.valueOf(lobbyTeam.teamId());
+            if (hasPlayers && session.findTeamByExternalId(externalTeamId).isEmpty()) {
+                session.createTeam(TeamId.generate(), lobbyTeam.name(), externalTeamId, lobbyTeam.colour());
+            }
+        }
+
         for (LobbyHandoff.Player lobbyPlayer : handoff.players()) {
             TeamId teamId = null;
             if (lobbyPlayer.teamId() != null) {

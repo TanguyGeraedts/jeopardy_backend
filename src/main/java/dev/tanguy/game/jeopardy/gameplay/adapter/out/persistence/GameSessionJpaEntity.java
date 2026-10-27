@@ -54,6 +54,18 @@ public class GameSessionJpaEntity {
     @Column(name = "buzzers_opened_at")
     private Instant buzzersOpenedAt;
 
+    @Column(name = "turns_enabled", nullable = false)
+    private boolean turnsEnabled;
+
+    @Column(name = "head_start_seconds", nullable = false)
+    private int headStartSeconds;
+
+    @Column(name = "turn_team_id")
+    private UUID turnTeamId;
+
+    @Column(name = "clue_turn_team_id")
+    private UUID clueTurnTeamId;
+
     /** Buzzes on the open clue, in arrival order. */
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "game_session_buzzes", joinColumns = @JoinColumn(name = "game_session_id"))
@@ -68,6 +80,7 @@ public class GameSessionJpaEntity {
     private List<ClueJpaEntity> clues = new ArrayList<>();
 
     @OneToMany(mappedBy = "gameSession", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("position ASC")
     @BatchSize(size = 50)
     @Builder.Default
     private List<TeamJpaEntity> teams = new ArrayList<>();

@@ -11,6 +11,7 @@ import dev.tanguy.game.jeopardy.gameplay.domain.model.ClueState;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.GameSession;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.Player;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.Team;
+import dev.tanguy.game.jeopardy.gameplay.domain.model.TurnRules;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -38,6 +39,10 @@ public class GameSessionMapper {
                 .buzzes(new ArrayList<>(session.getBuzzes().stream()
                         .map(buzz -> new BuzzEmbeddable(buzz.playerId().value(), buzz.at()))
                         .toList()))
+                .turnsEnabled(session.getTurnRules().enabled())
+                .headStartSeconds(session.getTurnRules().headStartSeconds())
+                .turnTeamId(session.getTurnTeamId() == null ? null : session.getTurnTeamId().value())
+                .clueTurnTeamId(session.getClueTurnTeamId() == null ? null : session.getClueTurnTeamId().value())
                 .build();
 
         int position = 0;
@@ -56,9 +61,11 @@ public class GameSessionMapper {
                     .build());
         }
 
+        int teamPosition = 0;
         for (Team team : session.getTeams()) {
             entity.addTeam(TeamJpaEntity.builder()
                     .id(team.getId().value())
+                    .position(teamPosition++)
                     .name(team.getName())
                     .externalTeamId(team.getExternalTeamId())
                     .colour(team.getColour())
@@ -99,6 +106,9 @@ public class GameSessionMapper {
                 entity.getActiveClueId() == null ? null : new ClueId(entity.getActiveClueId().toString()),
                 entity.getBuzzersOpenedAt(),
                 entity.getBuzzes().stream().map(buzz -> new Buzz(new PlayerId(buzz.getPlayerId()), buzz.getBuzzedAt())).toList(),
+                new TurnRules(entity.isTurnsEnabled(), entity.getHeadStartSeconds()),
+                entity.getTurnTeamId() == null ? null : new TeamId(entity.getTurnTeamId()),
+                entity.getClueTurnTeamId() == null ? null : new TeamId(entity.getClueTurnTeamId()),
                 clues,
                 teams,
                 players);

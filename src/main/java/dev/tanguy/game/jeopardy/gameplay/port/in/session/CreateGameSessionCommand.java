@@ -4,6 +4,7 @@ package dev.tanguy.game.jeopardy.gameplay.port.in.session;
 import dev.tanguy.game.jeopardy.common.domain.model.id.OwnerId;
 import dev.tanguy.game.jeopardy.common.domain.model.id.QuizId;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.GameMode;
+import dev.tanguy.game.jeopardy.gameplay.domain.model.TurnRules;
 
 import java.util.Objects;
 
@@ -13,7 +14,8 @@ public record CreateGameSessionCommand(
         GameMode mode,
         int maxPlayers,
         /** Number of teams: required for TEAM games, must be null for SOLO games. */
-        Integer teamCount
+        Integer teamCount,
+        TurnRules turnRules
 ) {
     public static final int DEFAULT_MAX_PLAYERS = 8;
 
@@ -21,6 +23,7 @@ public record CreateGameSessionCommand(
         Objects.requireNonNull(quizId, "quizId cannot be null");
         Objects.requireNonNull(requesterId, "requesterId cannot be null");
         Objects.requireNonNull(mode, "mode cannot be null");
+        Objects.requireNonNull(turnRules, "turnRules cannot be null (use TurnRules.OFF)");
         if (maxPlayers < 1) {
             throw new IllegalArgumentException("maxPlayers must be at least 1");
         }

@@ -26,6 +26,10 @@ public class TeamJpaEntity {
     @Column(name = "name", nullable = false)
     private String name;
 
+    /** The lobby's team order (scoreboard and turn rotation). */
+    @Column(name = "position", nullable = false)
+    private int position;
+
     @Column(name = "external_team_id")
     private String externalTeamId;
 

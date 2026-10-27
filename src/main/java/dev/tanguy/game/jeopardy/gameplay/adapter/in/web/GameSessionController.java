@@ -24,6 +24,7 @@ import dev.tanguy.game.jeopardy.gameplay.port.in.session.AddPlayerUseCase;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.AnswerClueCommand;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.AnswerClueResult;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.AnswerClueUseCase;
+import dev.tanguy.game.jeopardy.gameplay.domain.model.TurnRules;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.CreateGameSessionCommand;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.CreateGameSessionUseCase;
 import dev.tanguy.game.jeopardy.gameplay.port.in.session.GetGameSessionQuery;
@@ -72,7 +73,10 @@ public class GameSessionController {
                 requesterId,
                 request.mode(),
                 maxPlayers,
-                request.teamCount()
+                request.teamCount(),
+                new TurnRules(
+                        Boolean.TRUE.equals(request.turns()),
+                        request.headStartSeconds() != null ? request.headStartSeconds() : TurnRules.DEFAULT_HEAD_START)
         );
         GameSessionId sessionId = createGameSessionUseCase.createGameSession(command);
 

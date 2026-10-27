@@ -24,6 +24,10 @@ public final class ApiPaths {
         public static final String JUDGE = BY_ID + "/judge";
         public static final String CLOSE_CLUE = BY_ID + "/clue/close";
         public static final String END_GAME = BY_ID + "/end";
+        /** PUT { enabled, headStartSeconds } */
+        public static final String TURN_RULES = BY_ID + "/turns";
+        public static final String GIVE_TURN = BY_ID + "/turn/{teamId}";
+        public static final String SKIP_TURN = BY_ID + "/turn/skip";
         public static final String TEAM_SCORE = BY_ID + "/teams/{teamId}/score";
         public static final String TEAM_BUZZER_SOUND = BY_ID + "/teams/{teamId}/buzzer-sound";
     }
