@@ -31,6 +31,8 @@ services:
       SPRING_DATASOURCE_USERNAME: jeopardy
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       CLERK_ISSUER: ${CLERK_ISSUER:?Set CLERK_ISSUER in .env}
+      # Required by the privacy notice: without it, deleted accounts keep their quizzes.
+      CLERK_WEBHOOK_SIGNING_SECRET: ${CLERK_WEBHOOK_SIGNING_SECRET:?Set CLERK_WEBHOOK_SIGNING_SECRET in .env}
       JEOPARDY_PUBLIC_URL: ${JEOPARDY_PUBLIC_URL:-https://jeopardy.geraedts.dev}
       # The lobby stack's backend, over the shared gamenet network.
       LOBBY_BASE_URL: http://lobby-backend:8080

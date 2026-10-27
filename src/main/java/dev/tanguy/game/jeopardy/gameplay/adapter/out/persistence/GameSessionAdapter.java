@@ -1,6 +1,7 @@
 package dev.tanguy.game.jeopardy.gameplay.adapter.out.persistence;
 
 import dev.tanguy.game.jeopardy.common.domain.model.id.GameSessionId;
+import dev.tanguy.game.jeopardy.common.domain.model.id.OwnerId;
 import dev.tanguy.game.jeopardy.gameplay.domain.model.GameSession;
 import dev.tanguy.game.jeopardy.gameplay.port.out.session.DeleteGameSessionPort;
 import dev.tanguy.game.jeopardy.gameplay.port.out.session.LoadGameSessionPort;
@@ -9,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Optional;
 
 @Component
@@ -35,5 +37,17 @@ public class GameSessionAdapter implements LoadGameSessionPort, SaveGameSessionP
     @Transactional
     public void deleteGameSessionById(GameSessionId id) {
         repository.deleteById(id.value());
+    }
+
+    @Override
+    @Transactional
+    public int deleteGameSessionsByOwner(OwnerId ownerId) {
+        return repository.deleteByOwnerId(ownerId.value());
+    }
+
+    @Override
+    @Transactional
+    public int deleteGameSessionsCreatedBefore(Instant cutoff) {
+        return repository.deleteCreatedBefore(cutoff);
     }
 }

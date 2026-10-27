@@ -34,6 +34,11 @@ public final class ApiPaths {
         public static final String BY_ID = "/{id}";
     }
 
+    /** Calls from other services. Under /api/public: each checks its own signature instead of a login. */
+    public static final class Webhooks {
+        public static final String CLERK = "/api/public/webhooks/clerk";
+    }
+
     public static final class Creator {
         public static final String BASE = V1_BASE + "/quizzes";
         public static final String BY_ID = "/{id}";

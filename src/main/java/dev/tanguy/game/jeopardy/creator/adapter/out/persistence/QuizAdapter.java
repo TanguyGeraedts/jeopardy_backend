@@ -62,6 +62,15 @@ public class QuizAdapter implements QuizRepositoryPort {
     }
 
     @Override
+    @Transactional
+    public int deleteByOwner(OwnerId ownerId) {
+        // Through the entities, so categories, questions and topics go with them by cascade.
+        List<QuizJpaEntity> quizzes = quizJpaRepository.findByOwnerId(ownerId.value());
+        quizJpaRepository.deleteAll(quizzes);
+        return quizzes.size();
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<Quiz> searchPublished(String text, QuizTopic topic, DiscoverSort sort, int limit) {
         String pattern = text == null || text.isBlank()

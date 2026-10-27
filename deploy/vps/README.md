@@ -35,6 +35,9 @@ In the Clerk dashboard ([ADR 0002](../../docs/adr/0002-clerk-production-instance
    [Discord developer portal](https://discord.com/developers/applications). Paste their client ID and secret back into Clerk.
 4. Copy from Configure > API keys: the **Frontend API URL** (→ `CLERK_ISSUER`), the **publishable key** `pk_live_…`
    (→ GitHub variable, step 3) and the **secret key** `sk_live_…` (→ `.env`, step 5).
+5. **Account deletion:** Configure > Webhooks > Add endpoint `https://jeopardy.geraedts.dev/api/public/webhooks/clerk`,
+   subscribed to `user.deleted` only. Copy its **Signing secret** `whsec_…` (→ `CLERK_WEBHOOK_SIGNING_SECRET` in `.env`).
+   Also check Configure > Account portal / User & authentication that users may delete their own account.
 
 ### 3. GitHub
 

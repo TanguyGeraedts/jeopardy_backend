@@ -20,6 +20,9 @@ public interface QuizRepositoryPort {
 
     void deleteById(QuizId quizId);
 
+    /** Every quiz of this owner, published or not. Returns how many were deleted. */
+    int deleteByOwner(OwnerId ownerId);
+
     /** Published quizzes. text matches name or author (case-insensitive, blank = all); topic null = any. */
     List<Quiz> searchPublished(String text, QuizTopic topic, DiscoverSort sort, int limit);
 
